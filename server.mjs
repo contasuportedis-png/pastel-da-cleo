@@ -220,7 +220,7 @@ function sanitizeOrder(b) {
   let id = (typeof b.id === 'string' && /^[A-Za-z0-9-]{1,30}$/.test(b.id)) ? b.id : ('PED-' + Date.now().toString(36).toUpperCase());
   const exists = db.prepare('SELECT 1 FROM orders WHERE id=?').get(id);
   if (exists) id = id + '-' + crypto.randomBytes(2).toString('hex').toUpperCase();
-  return { id, nome, tipo, pag: b.pag, total: snum(b.total, 0, 1000000, 0), fee: snum(b.fee, 0, 1000, 0), addr, itens };
+  return { id, nome, tipo, pag: b.pag, total: snum(b.total, 0, 100000, 0), fee: snum(b.fee, 0, 1000, 0), addr, itens };
 }
 
 /* ---------------- auth ---------------- */
@@ -275,6 +275,7 @@ function send(res, status, body, type = 'application/json; charset=utf-8') {
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'X-Frame-Options': 'SAMEORIGIN',
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
     'Cross-Origin-Opener-Policy': 'same-origin-allow-popups'
   });
@@ -349,6 +350,13 @@ const server = http.createServer(async (req, res) => {
     const p = u.pathname;
     const ip = ipOf(req);
 
+    if ((p === '/robots.txt' || p === '/.well-known/security.txt') && req.method === 'GET') {
+      const txt = p === '/robots.txt'
+        ? 'User-agent: *\nAllow: /\n'
+        : 'Contact: https://pastel-da-cleo.onrender.com/#contato\nPreferred-Languages: pt-BR\n';
+      return send(res, 200, txt, 'text/plain; charset=utf-8');
+    }
+
     if (!p.startsWith('/api/')) {
       if (req.method !== 'GET') return send(res, 405, { error: 'Método não permitido.' });
       if (!serveStatic(req, res, p)) return send(res, 404, { error: 'Não encontrado.' });
@@ -372,6 +380,10 @@ const server = http.createServer(async (req, res) => {
       const o = sanitizeOrder(await parseBody(req, 64 * 1024));
       db.prepare('INSERT INTO orders(id,nome,tipo,pag,total,status,created_at,payload) VALUES(?,?,?,?,?,?,?,?)')
         .run(o.id, o.nome, o.tipo, o.pag, o.total, 'Novo', new Date().toISOString(), JSON.stringify({ itens: o.itens, addr: o.addr, fee: o.fee }));
+      try {
+        const MAX_ORDERS = Number(process.env.CLEO_MAX_ORDERS) || 500;
+        db.prepare('DELETE FROM orders WHERE id NOT IN (SELECT id FROM orders ORDER BY created_at DESC LIMIT ?)').run(MAX_ORDERS);
+      } catch {}
       return send(res, 201, { ok: true, id: o.id });
     }
 
@@ -458,6 +470,13 @@ const server = http.createServer(async (req, res) => {
       if (b.status === 'Cancelado') pl.cancelledAt = new Date().toISOString();
       else delete pl.cancelledAt;
       db.prepare('UPDATE orders SET status=?,payload=? WHERE id=?').run(b.status, JSON.stringify(pl), mPatch[1]);
+      return send(res, 200, { ok: true });
+    }
+
+    const mDel = /^\/api\/admin\/orders\/([A-Za-z0-9-]{1,40})$/.exec(p);
+    if (mDel && req.method === 'DELETE') {
+      const r = db.prepare('DELETE FROM orders WHERE id=?').run(mDel[1]);
+      if (!r.changes) return send(res, 404, { error: 'Pedido não encontrado.' });
       return send(res, 200, { ok: true });
     }
 
