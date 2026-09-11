@@ -1,6 +1,10 @@
 (function(){
 'use strict';
 var DB=loadDB(),TAB='produtos';
+/* tema noturno (mesmo do site) */
+function syncThemeIconA(){var dark=document.documentElement.getAttribute('data-theme')==='dark';var b=document.querySelector('#themeBtn');if(b)b.textContent=dark?'☀️':'🌙';}
+syncThemeIconA();
+document.querySelector('#themeBtn').addEventListener('click',function(){var d=document.documentElement;var dark=d.getAttribute('data-theme')!=='dark';if(dark)d.setAttribute('data-theme','dark');else d.removeAttribute('data-theme');try{localStorage.setItem('cleo_theme',dark?'dark':'light');}catch(e){}syncThemeIconA();});
 /* ---- modo servidor (quando aberto via `npm start`) ---- */
 var API_MODE=false, SYNCING=false, putTimer=null, lastOrdRefresh=0, apiSetupNeeded=false;
 function apiFetch(m,p,body){return fetch(p,{method:m,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined}).then(function(r){return r.json().catch(function(){return {};}).then(function(d){return{status:r.status,data:d||{}};});});}

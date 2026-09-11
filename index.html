@@ -11,6 +11,7 @@
 <meta property="og:image" content="https://images.unsplash.com/photo-1601050690597-df0568f70950?w=1200&q=80&auto=format&fit=crop">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
+<script src="assets/js/theme.js"></script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥟</text></svg>">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"Restaurant","name":"Pastel da Cléo","servesCuisine":"Pastelaria / Lanchonete","telephone":"+55-17-99215-4574","address":{"@type":"PostalAddress","streetAddress":"Av. Clelia Ceribelli de Assis Ferreira, 570 - Fraternidade","addressLocality":"São José do Rio Preto","addressRegion":"SP","postalCode":"15082-145","addressCountry":"BR"},"openingHours":["We-Sa 19:00-23:00","Su 19:00-23:00"],"priceRange":"$"}
@@ -20,7 +21,7 @@
 <header class="topbar"><div class="container topbar-in">
  <a class="logo" href="#inicio"><span class="logo-mark">🥟</span><span>Pastel da Cléo<small> Rio Preto • SP</small></span></a>
  <nav class="nav"><a href="#inicio">Início</a><a href="#cardapio">Cardápio</a><a href="#sobre">Sobre nós</a><a href="#delivery">Delivery</a><a href="#local">Localização</a><a href="#contato">Contato</a></nav>
- <div class="top-actions"><button class="cart-btn" data-action="open-cart" aria-label="Carrinho">🛒<span class="cart-count" data-cart-count>0</span></button><a href="#cardapio" class="btn btn-primary" style="padding:11px 18px">Fazer pedido</a><button class="hamb" data-action="menu">☰</button></div>
+ <div class="top-actions"><button class="cart-btn" data-action="theme" aria-label="Alternar modo noturno">🌙</button><button class="cart-btn" data-action="open-cart" aria-label="Carrinho">🛒<span class="cart-count" data-cart-count>0</span></button><a href="#cardapio" class="btn btn-primary" style="padding:11px 18px">Fazer pedido</a><button class="hamb" data-action="menu">☰</button></div>
 </div><div class="mobile-menu" id="mMenu"><a href="#inicio">Início</a><a href="#cardapio">Cardápio</a><a href="#sobre">Sobre nós</a><a href="#delivery">Delivery</a><a href="#local">Localização</a><a href="#contato">Contato</a></div></header>
 
 <main id="inicio" class="container">
@@ -79,7 +80,8 @@
 <aside class="drawer" id="cartDrawer"><div class="drawer-head"><h3>🛒 Seu pedido</h3><button class="x" data-action="close">✕</button></div>
 <div class="drawer-body"><div id="cartItems"></div></div>
 <div class="drawer-foot"><div class="kv"><span>Subtotal</span><strong id="cartSub">R$ 0</strong></div><div class="kv"><span>Entrega</span><strong id="cartFee">R$ 0</strong></div><div class="total-row"><span>Total</span><span id="cartTotal">R$ 0</span></div>
-<button class="btn btn-primary btn-block btn-lg" data-action="checkout">Finalizar pedido →</button><button class="btn btn-ghost btn-block" style="margin-top:8px" data-action="close">Continuar comprando</button></div></aside>
+<div class="notice" id="closedWarn" style="display:none;margin-bottom:10px">🔴 Estamos fechados agora — abrimos Qua a Dom, das 19h às 23h.</div>
+<button class="btn btn-primary btn-block btn-lg" id="checkoutBtn" data-action="checkout">Finalizar pedido →</button><button class="btn btn-ghost btn-block" style="margin-top:8px" data-action="close">Continuar comprando</button></div></aside>
 
 <div class="modal" id="productModal"><div class="modal-box" id="modalBox"></div></div>
 
@@ -94,7 +96,8 @@
 <div class="field" style="margin-top:12px"><label>Forma de pagamento</label><div class="pay-grid"><div class="pay" data-action="pay" data-pay="Pix">⚡ Pix</div><div class="pay" data-action="pay" data-pay="Dinheiro">💵 Dinheiro</div><div class="pay" data-action="pay" data-pay="Cartão de crédito">💳 Crédito</div><div class="pay" data-action="pay" data-pay="Cartão de débito">💳 Débito</div></div></div>
 <div id="trocoBox"><div class="field"><label>Precisa de troco?</label><div class="radio-cards"><div class="radio-card" data-action="troco" data-troco="nao">Não</div><div class="radio-card" data-action="troco" data-troco="sim">Sim</div></div></div>
 <div class="field" id="trocoParaBox"><label>Troco para R$</label><input id="coTrocoPara" maxlength="20" inputmode="decimal" autocomplete="off" placeholder="Ex: 50"></div></div>
-<button class="btn btn-primary btn-block btn-lg" data-action="finish">ENVIAR PEDIDO NO WHATSAPP 💬</button>
+<div class="notice" id="sendWarn" style="display:none;margin-bottom:10px">🔴 Estamos fechados agora — abrimos Qua a Dom, das 19h às 23h. Seu carrinho fica salvo! 🛒</div>
+<button class="btn btn-primary btn-block btn-lg" id="sendBtn" data-action="finish">ENVIAR PEDIDO NO WHATSAPP 💬</button>
 <button class="btn btn-ghost btn-block" style="margin-top:8px" data-action="close">Voltar</button>
 </div></div></div>
 

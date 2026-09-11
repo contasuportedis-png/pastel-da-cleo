@@ -137,6 +137,25 @@ const ORDER_STATUS = ['Novo', 'Confirmado', 'Preparando', 'Pronto', 'Saiu para e
 const PAY_METHODS = ['Pix', 'Dinheiro', 'Cartão de crédito', 'Cartão de débito'];
 const DAY_NAMES = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
+/* Horário de SP puro (exportado p/ testes). weekdayShort: 'Sun'..'Sat' (Intl en-US). */
+export function isOpenAt(hours, weekdayShort, mins) {
+  const dm = { Sun: 'Domingo', Mon: 'Segunda', Tue: 'Terça', Wed: 'Quarta', Thu: 'Quinta', Fri: 'Sexta', Sat: 'Sábado' };
+  const h = Array.isArray(hours) ? hours.find(x => x && x.dia === dm[weekdayShort]) : null;
+  if (!h || h.fechado) return false;
+  const t = (s, fb) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(s || '') ? s : fb);
+  const [oh, om] = t(h.open, '00:00').split(':').map(Number), [ch, cm] = t(h.close, '00:00').split(':').map(Number);
+  return mins >= (oh * 60 + om) && mins < (ch * 60 + cm);
+}
+function storeOpenNow() {
+  if (process.env.CLEO_ALWAYS_OPEN) return true;
+  try {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date()).map(x => [x.type, x.value]));
+    const mins = Number(p.hour) * 60 + Number(p.minute);
+    if (!Number.isFinite(mins)) return true; // fail-open: nunca travar venda por erro
+    return isOpenAt(kvGet('hours'), p.weekday, mins);
+  } catch { return true; }
+}
+
 function sanitizeAdminData(b) {
   if (!b || typeof b !== 'object') throw err(400, 'Dados inválidos.');
   const out = {};
@@ -236,6 +255,7 @@ function sanitizeOrder(b) {
   const qProd = db.prepare('SELECT preco FROM products WHERE (id=? OR nome=?) AND ativo=1 LIMIT 1');
   for (const it of cleanItens) {
     const prod = qProd.get(it.pid || '', it.nome);
+    if (prod && (prod.preco === null || prod.preco === undefined)) throw err(400, 'Item indisponível no momento.');
     if (prod && prod.preco !== null && prod.preco !== undefined) {
       const base = Number(prod.preco) * it.qty;
       if (it.sub + 0.009 < base) throw err(400, 'Subtotal abaixo do cardápio.');
@@ -400,6 +420,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/orders' && req.method === 'POST') {
+      if (!storeOpenNow()) return send(res, 403, { error: 'Estamos fechados no momento. Abrimos Qua a Dom, das 19h às 23h.' });
       const now = Date.now();
       const arr = (orderHits.get(ip) || []).filter(t => now - t < 3600000);
       if (arr.length >= HOUR_MAX) return send(res, 429, { error: 'Limite de pedidos por hora atingido.' });
