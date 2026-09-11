@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Pastel da Cléo | Pastelaria em São José do Rio Preto – Delivery e Retirada</title>
+<meta name="description" content="Pastel da Cléo — pastelaria em São José do Rio Preto (Fraternidade). Pastéis salgados, doces, bebidas. Delivery e retirada. Peça pelo WhatsApp (17) 99215-4574.">
+<meta property="og:title" content="Pastel da Cléo — Pastéis preparados com muito sabor">
+<meta property="og:description" content="Pastelaria em São José do Rio Preto. Delivery e retirada. Peça pelo WhatsApp.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://images.unsplash.com/photo-1601050690597-df0568f70950?w=1200&q=80&auto=format&fit=crop">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥟</text></svg>">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Restaurant","name":"Pastel da Cléo","servesCuisine":"Pastelaria / Lanchonete","telephone":"+55-17-99215-4574","address":{"@type":"PostalAddress","streetAddress":"Av. Clelia Ceribelli de Assis Ferreira, 570 - Fraternidade","addressLocality":"São José do Rio Preto","addressRegion":"SP","postalCode":"15082-145","addressCountry":"BR"},"openingHours":["We-Sa 19:00-23:00","Su 19:00-23:00"],"priceRange":"$"}
+</script>
+</head>
+<body>
+<header class="topbar"><div class="container topbar-in">
+ <a class="logo" href="#inicio"><span class="logo-mark">🥟</span><span>Pastel da Cléo<small> Rio Preto • SP</small></span></a>
+ <nav class="nav"><a href="#inicio">Início</a><a href="#cardapio">Cardápio</a><a href="#sobre">Sobre nós</a><a href="#delivery">Delivery</a><a href="#local">Localização</a><a href="#contato">Contato</a></nav>
+ <div class="top-actions"><button class="cart-btn" onclick="openCart()" aria-label="Carrinho">🛒<span class="cart-count" data-cart-count>0</span></button><a href="#cardapio" class="btn btn-primary" style="padding:11px 18px">Fazer pedido</a><button class="hamb" onclick="toggleMenu()">☰</button></div>
+</div><div class="mobile-menu" id="mMenu"><a href="#inicio">Início</a><a href="#cardapio">Cardápio</a><a href="#sobre">Sobre nós</a><a href="#delivery">Delivery</a><a href="#local">Localização</a><a href="#contato">Contato</a></div></header>
+
+<main id="inicio" class="container">
+<section class="hero"><div class="hero-grid">
+ <div><span class="eyebrow" data-open-status>…</span>
+  <h1>PASTEL DA CLÉO<br><span>Pastéis preparados com muito sabor.</span></h1>
+  <p class="sub">Pastel crocante, recheio generoso e aquele atendimento de bairro que a gente gosta. Peça em 1 minuto pelo WhatsApp.</p>
+  <div class="hero-ctas"><a href="#cardapio" class="btn btn-primary btn-lg">🍴 FAZER PEDIDO</a><a href="#cardapio" class="btn btn-ghost btn-lg">VER CARDÁPIO</a></div>
+  <div class="trust"><span>🥟 Pastéis artesanais</span><span>🧀 Ingredientes selecionados</span><span>🛵 Delivery</span><span>🏃 Retirada no local</span></div>
+ </div>
+ <div class="hero-img"><img src="https://images.unsplash.com/photo-1601050690597-df0568f70950?w=1000&q=80&auto=format&fit=crop" alt="Pastel brasileiro crocante" fetchpriority="high">
+  <div class="price-float"><span style="font-size:34px">🥟</span><div><div class="stars">★★★★★</div><strong>Pastel de Frango R$ 18</strong><br><small style="color:#6B625C">O queridinho da casa</small></div></div>
+ </div>
+</div></section>
+
+<section><div class="sec-head"><div><h2>Os favoritos da Cléo ❤️</h2><p>Os mais pedidos pelos clientes</p></div><a href="#cardapio" class="btn btn-ghost">Ver tudo</a></div><div id="favGrid" class="grid-cards"></div></section>
+</main>
+
+<div class="toolbar" id="cardapio"><div class="container">
+ <div class="search"><input id="searchInput" maxlength="60" autocomplete="off" placeholder="🔎 Buscar no cardápio — digite carne, queijo, frango..."></div>
+ <div class="chips" id="chips"></div>
+</div></div>
+<main class="container"><section style="padding-top:18px"><div class="sec-head"><div><h2>Cardápio completo</h2><p>Escolha, personalize e peça pelo WhatsApp</p></div></div><div id="menuList"></div></section>
+
+<section id="promos"><div class="sec-head"><div><h2>Promoções da Cléo 🎁</h2><p>Ofertas e combos da semana</p></div></div><div id="promoGrid" class="grid-cards"><div class="empty">Nenhuma promoção ativa no momento. Fique de olho — novidades em breve! 💛<br><small>Promoções podem ser criadas no painel administrativo.</small></div></div></section>
+
+<section id="delivery"><div class="sec-head"><div><h2>Delivery da Cléo 🛵</h2><p>Receba seu pedido no conforto da sua casa</p></div></div>
+<div class="info-grid"><div class="info"><h3>🛵 Delivery disponível</h3><p style="color:#6B625C">Informe seu bairro no checkout e a taxa aparece automaticamente. Tempo estimado: <strong id="eta">30 a 50 min</strong>.</p><div id="bairroTable"></div><a href="#cardapio" class="btn btn-primary btn-block" style="margin-top:12px">PEDIR AGORA</a></div>
+<div class="info"><h3>🏃 Retire seu pedido no local</h3><p style="color:#6B625C"><span data-set="endereco"></span></p><div style="display:flex;gap:10px;flex-wrap:wrap"><a data-wa class="btn btn-amarelo" target="_blank" rel="noopener">💬 Chamar no WhatsApp</a><a id="mapsBtn1" href="https://www.google.com/maps/search/?api=1&query=Av.+Clelia+Ceribelli+de+Assis+Ferreira,+570+-+Fraternidade,+S%C3%A3o+Jos%C3%A9+do+Rio+Preto" target="_blank" rel="noopener" class="btn btn-ghost">📍 Ver no mapa</a></div></div></div></section>
+
+<section><div class="info-grid">
+<div class="info"><h3>⏰ Horários</h3><div id="hoursBadge" style="margin-bottom:8px"></div><div id="hoursTable"></div><p class="notice">Status calculado automaticamente no horário de São Paulo. Horários podem ser alterados no painel administrativo.</p></div>
+<div class="info" id="sobre"><h3>💛 Sobre nós</h3><p id="aboutText" style="color:#4a423c"></p><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px"><img loading="lazy" style="border-radius:14px;height:150px;object-fit:cover;width:100%" src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&q=70&auto=format&fit=crop" alt="Loja"><img loading="lazy" style="border-radius:14px;height:150px;object-fit:cover;width:100%" src="https://images.unsplash.com/photo-1601050690597-df0568f70950?w=600&q=70&auto=format&fit=crop" alt="Pastéis"></div></div>
+</div></section>
+
+<section><div class="sec-head"><div><h2>O que nossos clientes dizem ⭐</h2></div></div><div id="revGrid" class="grid-cards"></div></section>
+
+<section id="local"><div class="sec-head"><div><h2>Onde estamos 📍</h2><p data-set="endereco"></p></div></div>
+<div class="info-grid"><div class="info"><h3>Pastel da Cléo</h3><p>Av. Clelia Ceribelli de Assis Ferreira, 570<br>Fraternidade<br>São José do Rio Preto – SP<br>15082-145</p><p>📞 <strong data-set="telefone"></strong></p><div style="display:flex;gap:10px;flex-wrap:wrap"><a href="https://www.google.com/maps/search/?api=1&query=Av.+Clelia+Ceribelli+de+Assis+Ferreira,+570+-+Fraternidade,+S%C3%A3o+Jos%C3%A9+do+Rio+Preto" target="_blank" rel="noopener" class="btn btn-primary">Abrir no Google Maps</a><a data-wa target="_blank" rel="noopener" class="btn btn-ghost">Chamar no WhatsApp</a></div></div>
+<div><iframe class="map" title="Mapa — Pastel da Cléo" referrerpolicy="no-referrer-when-downgrade" loading="lazy" src="https://www.google.com/maps?q=Av.+Clelia+Ceribelli+de+Assis+Ferreira,+570,+S%C3%A3o+Jos%C3%A9+do+Rio+Preto&output=embed"></iframe></div></div></section>
+
+<section id="contato" style="text-align:center"><h2 style="font-family:Sora">Siga a Pastel da Cléo 📸</h2><p style="color:#6B625C">Novidades, promoções e bastidores</p><a id="igBtn" class="btn btn-primary btn-lg" target="_blank" rel="noopener">📸 Instagram</a><div id="igEmpty" class="notice" style="max-width:480px;margin:12px auto">Instagram oficial em breve — link poderá ser adicionado no painel administrativo.</div>
+<div style="margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><a data-wa target="_blank" rel="noopener" class="btn btn-amarelo btn-lg">💬 (17) 99215-4574</a></div></section>
+</main>
+
+<footer><div class="container foot-grid">
+<div><div class="logo" style="color:#fff">🥟 Pastel da Cléo</div><p style="color:#cbbfa9;font-size:14px"><span data-set="endereco"></span><br>Telefone: <span data-set="telefone"></span></p><a class="admin-link" href="admin.html">Área administrativa</a></div>
+<div><strong>Links</strong><br><br><a href="#inicio">Início</a><br><a href="#cardapio">Cardápio</a><br><a href="#delivery">Delivery</a><br><a href="#local">Localização</a><br><a href="#contato">Contato</a></div>
+<div><strong>Horários</strong><p style="color:#cbbfa9;font-size:14px">Qua a Dom — 19:00 às 23:00<br>Seg e Ter — fechado</p><p style="color:#cbbfa9">© Pastel da Cléo. Todos os direitos reservados.</p></div>
+</div></footer>
+
+<a data-wa target="_blank" rel="noopener" class="wa-float" aria-label="WhatsApp">💬</a>
+<nav class="bottombar"><a href="#inicio"><b>🏠</b>Início</a><a href="#cardapio"><b>🍴</b>Cardápio</a><a href="#" onclick="openCart();return false"><b>🛒</b>Carrinho (<span data-cart-count>0</span>)</a><a href="#local"><b>📍</b>Local</a><a data-wa target="_blank" rel="noopener"><b>💬</b>WhatsApp</a></nav>
+
+<div class="overlay" id="overlay"></div>
+<aside class="drawer" id="cartDrawer"><div class="drawer-head"><h3>🛒 Seu pedido</h3><button class="x" onclick="closeAll()">✕</button></div>
+<div class="drawer-body"><div id="cartItems"></div></div>
+<div class="drawer-foot"><div class="kv"><span>Subtotal</span><strong id="cartSub">R$ 0</strong></div><div class="kv"><span>Entrega</span><strong id="cartFee">R$ 0</strong></div><div class="total-row"><span>Total</span><span id="cartTotal">R$ 0</span></div>
+<button class="btn btn-primary btn-block btn-lg" onclick="openCheckout()">Finalizar pedido →</button><button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeAll()">Continuar comprando</button></div></aside>
+
+<div class="modal" id="productModal"><div class="modal-box" id="modalBox"></div></div>
+
+<div class="modal" id="checkoutModal"><div class="modal-box"><div class="modal-pad">
+<h3 style="font-family:Sora;margin:0">Finalizar pedido 🧾</h3><p style="color:#6B625C">Rapidinho, prometo 🙂</p>
+<div class="field"><label>Seu nome</label><input id="coName" maxlength="80" autocomplete="name" placeholder="Digite seu nome"></div>
+<div class="field"><label>Tipo de pedido</label><div class="radio-cards"><div class="radio-card" data-tipo="delivery" onclick="setTipo('delivery')">🛵 Delivery</div><div class="radio-card" data-tipo="retirada" onclick="setTipo('retirada')">🏃 Retirada no local</div></div></div>
+<div id="addrBox"><div class="field"><label>Bairro</label><input id="coBairro" maxlength="80" autocomplete="address-level3" list="bairroList" placeholder="Ex: Fraternidade" oninput="checkout.bairro=this.value;syncCheckoutForm()"><datalist id="bairroList"></datalist></div>
+<div class="row2"><div class="field"><label>Rua</label><input id="coRua" maxlength="120" autocomplete="street-address" placeholder="Rua / Avenida"></div><div class="field"><label>Número</label><input id="coNum" maxlength="20" inputmode="numeric" autocomplete="off" placeholder="123"></div></div>
+<div class="row2"><div class="field"><label>Complemento</label><input id="coCompl" maxlength="80" autocomplete="off" placeholder="Apto, bloco..."></div><div class="field"><label>Referência</label><input id="coRef" maxlength="120" autocomplete="off" placeholder="Próx. à..."></div></div>
+<div class="notice" id="feeHint"></div></div>
+<div class="field" style="margin-top:12px"><label>Forma de pagamento</label><div class="pay-grid"><div class="pay" data-pay="Pix" onclick="setPay('Pix')">⚡ Pix</div><div class="pay" data-pay="Dinheiro" onclick="setPay('Dinheiro')">💵 Dinheiro</div><div class="pay" data-pay="Cartão de crédito" onclick="setPay('Cartão de crédito')">💳 Crédito</div><div class="pay" data-pay="Cartão de débito" onclick="setPay('Cartão de débito')">💳 Débito</div></div></div>
+<div id="trocoBox"><div class="field"><label>Precisa de troco?</label><div class="radio-cards"><div class="radio-card" data-troco="nao" onclick="setTroco('nao')">Não</div><div class="radio-card" data-troco="sim" onclick="setTroco('sim')">Sim</div></div></div>
+<div class="field" id="trocoParaBox"><label>Troco para R$</label><input id="coTrocoPara" maxlength="20" inputmode="decimal" autocomplete="off" placeholder="Ex: 50"></div></div>
+<button class="btn btn-primary btn-block btn-lg" onclick="finishOrder()">ENVIAR PEDIDO NO WHATSAPP 💬</button>
+<button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeAll()">Voltar</button>
+</div></div></div>
+
+<div class="modal" id="successModal"><div class="modal-box"><div class="modal-pad" style="text-align:center">
+<div style="font-size:56px">🎉</div><h3 style="font-family:Sora">Pedido recebido!</h3><p>Seu pedido foi enviado para a Pastel da Cléo no WhatsApp.</p>
+<div class="steps" id="orderSteps"></div>
+<button class="btn btn-primary btn-block" onclick="closeAll()">Voltar ao cardápio</button>
+</div></div></div>
+
+<script src="assets/js/data.js"></script><script src="assets/js/security.js"></script><script src="assets/js/api.js"></script><script src="assets/js/app.js"></script>
+</body></html>

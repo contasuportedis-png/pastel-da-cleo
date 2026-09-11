@@ -1,0 +1,166 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin — Pastel da Cléo</title>
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="description" content="Área administrativa restrita.">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>.admin{max-width:1080px;margin:90px auto 40px;padding:0 18px}.tabs{display:flex;gap:8px;overflow-x:auto;margin:16px 0}.tab{white-space:nowrap;border:1.5px solid #e8ddc8;background:#fff;border-radius:999px;padding:10px 16px;font-weight:700;cursor:pointer}.tab.on{background:#191410;color:#fff}table{width:100%;border-collapse:collapse;background:#fff;border-radius:14px;overflow:hidden;font-size:14px}th,td{padding:10px;border-bottom:1px solid #eee;text-align:left}th{background:#191410;color:#fff}.mini{border:1px solid #e3d7c0;background:#fff;border-radius:8px;padding:7px 10px;cursor:pointer;font-weight:700;font-size:13px}.login{max-width:400px;margin:110px auto;background:#fff;padding:28px;border-radius:20px;box-shadow:var(--shadow)}.lock{background:#fdebee;border:1px solid #f5c2cc;color:#8a0f24;border-radius:12px;padding:10px 12px;font-size:13px;font-weight:700;margin-bottom:10px}</style></head>
+<body>
+<header class="topbar"><div class="container topbar-in"><a class="logo" href="index.html">🥟 Pastel da Cléo <small style="margin-left:8px">ADMIN</small></a><div class="top-actions"><a href="index.html" class="btn btn-ghost" style="padding:10px 16px">Ver site</a><button class="mini" id="logoutBtn" style="display:none">Sair</button></div></div></header>
+<div id="loginBox" class="login"><h3 style="font-family:Sora" id="authTitle">Acesso restrito 🔒</h3><div id="authMsg"></div>
+<div id="setupBox" style="display:none"><p style="color:#6B625C;font-size:14px">Primeiro acesso: crie uma senha forte (mín. 8 caracteres). Ela é guardada apenas neste aparelho, como hash com salt — nunca em texto puro.</p>
+<div class="field"><label>Nova senha</label><input type="password" id="npw1" maxlength="100" autocomplete="new-password" placeholder="Mínimo 8 caracteres"></div>
+<div class="field"><label>Confirmar senha</label><input type="password" id="npw2" maxlength="100" autocomplete="new-password" placeholder="Repita a senha"></div>
+<button class="btn btn-primary btn-block" id="setupBtn">Criar senha e entrar</button></div>
+<div id="loginForm" style="display:none"><p style="color:#6B625C;font-size:14px">Digite sua senha de administradora.</p>
+<div class="field"><label>Senha</label><input type="password" id="pw" maxlength="100" autocomplete="current-password" placeholder="••••••"></div>
+<button class="btn btn-primary btn-block" id="loginBtn">Entrar</button></div></div>
+<div id="panel" class="admin" style="display:none">
+<h2 style="font-family:Sora">Painel administrativo ⚙️</h2>
+<p class="notice" id="secNotice">🔒 Sessão expira após 30 min sem atividade. Os dados ficam salvos <strong>neste aparelho</strong> (armazenamento local do navegador). Para gerenciar de outros aparelhos ou ter controle de acesso real multiusuário, o próximo passo é um backend com login no servidor.</p>
+<div class="tabs" id="tabs"></div><div id="tabBody"></div>
+</div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/security.js"></script>
+<script src="assets/js/api.js"></script>
+<script>
+(function(){
+'use strict';
+var DB=loadDB(),TAB='produtos';
+/* ---- modo servidor (quando aberto via `npm start`) ---- */
+var API_MODE=false, SYNCING=false, putTimer=null, lastOrdRefresh=0, apiSetupNeeded=false;
+function apiFetch(m,p,body){return fetch(p,{method:m,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined}).then(function(r){return r.json().catch(function(){return {};}).then(function(d){return{status:r.status,data:d||{}};});});}
+var localSaveDB=saveDB;
+saveDB=function(db){localSaveDB(db);if(API_MODE&&!SYNCING){if(putTimer)clearTimeout(putTimer);putTimer=setTimeout(function(){var copy=Object.assign({},DB,{orders:[]});apiFetch('PUT','/api/admin/data',copy).then(function(r){if(r.status===401){alert('Sessão do servidor expirou. Entre novamente.');logout();}}).catch(function(){});},800);}};
+async function loadServerData(){var r=await apiFetch('GET','/api/admin/data');if(r.status!==200||!r.data||!Array.isArray(r.data.products))throw new Error('load');SYNCING=true;try{var d=r.data;if(d.settings&&typeof d.settings==='object')DB.settings=Object.assign({},DB.settings,d.settings);if(Array.isArray(d.hours)&&d.hours.length===7)DB.hours=d.hours;if(Array.isArray(d.categories)&&d.categories.length)DB.categories=d.categories;DB.products=Array.isArray(d.products)?d.products:[];if(Array.isArray(d.addons))DB.addons=d.addons;if(Array.isArray(d.bairros))DB.bairros=d.bairros;if(Array.isArray(d.reviews))DB.reviews=d.reviews;DB.orders=Array.isArray(d.orders)?d.orders:[];localSaveDB(DB);}finally{SYNCING=false;}}
+async function refreshOrders(){if(!API_MODE)return;try{var r=await apiFetch('GET','/api/admin/data');if(r.status===200&&r.data&&Array.isArray(r.data.orders)){var s=JSON.stringify(r.data.orders);if(s!==JSON.stringify(DB.orders)){DB.orders=r.data.orders;SYNCING=true;try{localSaveDB(DB);}finally{SYNCING=false;}if(TAB==='pedidos')render();}}}catch(e){}}
+var CRED_KEY='cleo_auth_v2',SESS_KEY='cleo_admin_sess',LOCK_KEY='cleo_admin_lock';
+var SESS_MIN=30,MAX_FAILS=5;
+/* Remove credencial legada em texto puro (versão antiga) e força nova senha */
+try{if(localStorage.getItem('cleo_pw')!==null){localStorage.removeItem('cleo_pw');}}catch(e){}
+function getCred(){try{var c=JSON.parse(localStorage.getItem(CRED_KEY)||'null');return(c&&c.salt&&c.hash)?c:null;}catch(e){return null;}}
+function getLock(){try{var l=JSON.parse(localStorage.getItem(LOCK_KEY)||'{"fails":0,"until":0}');return(typeof l.fails==='number'&&typeof l.until==='number')?l:{fails:0,until:0};}catch(e){return{fails:0,until:0};}}
+function setLock(l){try{localStorage.setItem(LOCK_KEY,JSON.stringify(l));}catch(e){}}
+function sessValid(){try{var t=Number(sessionStorage.getItem(SESS_KEY)||0);return t&& (Date.now()-t)<SESS_MIN*60*1000;}catch(e){return false;}}
+function touchSess(){try{sessionStorage.setItem(SESS_KEY,String(Date.now()));}catch(e){}}
+function msg(html){document.querySelector('#authMsg').innerHTML=html;}
+function showAuth(){
+  var hasPw=!!getCred(),lock=getLock(),now=Date.now();
+  document.querySelector('#setupBox').style.display=hasPw?'none':'block';
+  document.querySelector('#loginForm').style.display=hasPw?'block':'none';
+  document.querySelector('#authTitle').textContent=hasPw?'Acesso restrito 🔒':'Criar senha de acesso 🔑';
+  if(hasPw&&lock.until>now){var s=Math.ceil((lock.until-now)/1000);msg('<div class="lock">⛔ Muitas tentativas. Tente novamente em '+s+'s.</div>');setTimeout(showAuth,1000);}
+  else msg('');
+}
+async function doSetup(){
+  var a=document.querySelector('#npw1').value,b=document.querySelector('#npw2').value;
+  if(!a||a.length<8)return alert('A senha precisa de no mínimo 8 caracteres.');
+  if(a.length>100)return alert('Senha muito longa (máx. 100).');
+  if(a!==b)return alert('As senhas não conferem.');
+  if(API_MODE){var r=await apiFetch('POST','/api/admin/setup',{password:a});document.querySelector('#npw1').value='';document.querySelector('#npw2').value='';if(r.status===201||r.status===200){touchSess();try{await loadServerData();}catch(e){}enter();}else alert((r.data&&r.data.error)||'Falha ao criar senha.');return;}
+  var cred=await SEC.hashPassword(a);
+  try{localStorage.setItem(CRED_KEY,JSON.stringify(cred));}catch(e){return alert('Não foi possível salvar. Libere espaço do navegador.');}
+  document.querySelector('#npw1').value='';document.querySelector('#npw2').value='';
+  touchSess();enter();
+}
+async function doLogin(){
+  if(API_MODE){var vv=document.querySelector('#pw').value;var rr=await apiFetch('POST','/api/admin/login',{password:vv});document.querySelector('#pw').value='';if(rr.status===200){touchSess();try{await loadServerData();}catch(e){return alert('Entrou, mas falhou carregar os dados.');}enter();}else if(rr.status===429){alert('Muitas tentativas. Aguarde '+((rr.data&&rr.data.retryIn)||60)+'s.');}else alert('Senha incorreta.');return;}
+  var lock=getLock(),now=Date.now();
+  if(lock.until>now){showAuth();return;}
+  var v=document.querySelector('#pw').value,cred=getCred();
+  var ok=cred?await SEC.verifyPassword(v,cred):false;
+  document.querySelector('#pw').value='';
+  if(ok){setLock({fails:0,until:0});touchSess();enter();}
+  else{lock.fails++;var wait=lock.fails>=MAX_FAILS?Math.min(15*60*1000,Math.pow(2,lock.fails-MAX_FAILS)*60*1000):0;
+    lock.until=wait?now+wait:0;setLock(lock);
+    alert(wait?'Senha incorreta. Bloqueio temporário ativado.':'Senha incorreta.');showAuth();}
+}
+function logout(){if(API_MODE){try{apiFetch('POST','/api/admin/logout').catch(function(){});}catch(e){}}try{sessionStorage.removeItem(SESS_KEY);}catch(e){}location.reload();}
+function enter(){document.querySelector('#loginBox').style.display='none';document.querySelector('#panel').style.display='block';document.querySelector('#logoutBtn').style.display='block';if(API_MODE){var n=document.querySelector('#secNotice');if(n)n.innerHTML='🌐 <strong>Modo servidor:</strong> alterações valem para todos os aparelhos na hora. Pedidos novos chegam sozinhos na aba Pedidos.';}render();}
+document.querySelector('#setupBtn').addEventListener('click',doSetup);
+document.querySelector('#loginBtn').addEventListener('click',doLogin);
+document.querySelector('#logoutBtn').addEventListener('click',logout);
+document.querySelector('#pw').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
+['click','keydown'].forEach(function(ev){document.addEventListener(ev,function(){if(sessValid())touchSess();else if(document.querySelector('#panel').style.display==='block'){alert('Sessão expirada. Entre novamente.');logout();}},true);});
+if(sessValid()&&getCred()&&false)enter();else boot();
+async function boot(){
+  var h=null;
+  try{var hr=await fetch('/api/health',{cache:'no-store'});h=hr.ok?await hr.json():null;}catch(e){h=null;}
+  if(h&&h.api){
+    API_MODE=true;apiSetupNeeded=!!h.setupNeeded;
+    if(apiSetupNeeded){showApiSetup();return;}
+    try{var me=await apiFetch('GET','/api/admin/me');if(me.status===200){touchSess();await loadServerData();enter();return;}}catch(e){}
+    showApiLogin();return;
+  }
+  if(sessValid()&&getCred())enter();else showAuth();
+}
+function showApiSetup(){document.querySelector('#setupBox').style.display='block';document.querySelector('#loginForm').style.display='none';document.querySelector('#authTitle').textContent='Criar senha de acesso 🔑 (servidor)';msg('<p class="notice">🌐 Primeiro acesso ao <strong>servidor</strong>: esta senha valerá para o painel em qualquer aparelho.</p>');}
+function showApiLogin(){document.querySelector('#setupBox').style.display='none';document.querySelector('#loginForm').style.display='block';document.querySelector('#authTitle').textContent='Acesso restrito 🔒 (servidor)';msg('');}
+
+var TABS=[['produtos','🍴 Produtos'],['categorias','📂 Categorias'],['adicionais','🧀 Adicionais'],['pedidos','🧾 Pedidos'],['delivery','🛵 Delivery'],['horarios','⏰ Horários'],['loja','🏠 Loja'],['avaliacoes','⭐ Avaliações']];
+function esc(s){return SEC.esc(s);}
+window.render=function(){
+  document.querySelector('#tabs').innerHTML=TABS.map(function(t){return '<div class="tab '+(TAB===t[0]?'on':'')+'" data-tab="'+t[0]+'">'+t[1]+'</div>';}).join('');
+  document.querySelectorAll('[data-tab]').forEach(function(b){b.addEventListener('click',function(){TAB=b.dataset.tab;render();});});
+  var b=document.querySelector('#tabBody');
+if(TAB==='produtos'){b.innerHTML='<button class="btn btn-primary" id="np">+ Novo produto</button><div style="height:12px"></div><div style="overflow:auto"><table><tr><th>Produto</th><th>Cat</th><th>Preço</th><th>Status</th><th></th></tr>'+DB.products.map(function(p){return '<tr><td><strong>'+esc(p.nome)+'</strong><br><small>'+esc(p.desc||'')+'</small></td><td>'+esc(p.categoria)+'</td><td>'+(p.preco==null?'a configurar':money(p.preco))+'</td><td>'+(p.ativo?'✅':'⏸️')+' '+(p.favorito?'❤️':'')+'</td><td><button class="mini" data-edit="'+esc(p.id)+'">Editar</button> <button class="mini" data-del="'+esc(p.id)+'">Excluir</button></td></tr>';}).join('')+'</table></div>';
+  document.querySelector('#np').addEventListener('click',function(){editProd('');});
+  b.querySelectorAll('[data-edit]').forEach(function(x){x.addEventListener('click',function(){editProd(x.dataset.edit);});});
+  b.querySelectorAll('[data-del]').forEach(function(x){x.addEventListener('click',function(){delProd(x.dataset.del);});});}
+if(TAB==='categorias'){b.innerHTML='<div class="info"><h3>Categorias</h3>'+DB.categories.map(function(c){return '<div class="kv"><span>'+esc(c.emoji)+' '+esc(c.nome)+' ('+esc(c.id)+')</span><span><button class="mini" data-dc="'+esc(c.id)+'">Excluir</button></span></div>';}).join('')+'<div class="row2" style="margin-top:10px"><input id="ncN" maxlength="60" placeholder="Nome"><input id="ncE" maxlength="12" placeholder="Emoji"></div><button class="btn btn-primary" style="margin-top:10px" id="acBtn">Adicionar categoria</button></div>';
+  b.querySelectorAll('[data-dc]').forEach(function(x){x.addEventListener('click',function(){delCat(x.dataset.dc);});});
+  document.querySelector('#acBtn').addEventListener('click',addCat);}
+if(TAB==='adicionais'){b.innerHTML='<div class="info"><h3>Adicionais</h3>'+DB.addons.map(function(a){return '<div class="kv"><span>'+esc(a.nome)+' — '+money(a.preco)+'</span><span><button class="mini" data-ta="'+esc(a.id)+'">'+(a.ativo?'Desativar':'Ativar')+'</button></span></div>';}).join('')+'<div class="row2" style="margin-top:10px"><input id="naN" maxlength="60" placeholder="Nome"><input id="naP" placeholder="Preço" type="number" min="0" max="500" step="0.01"></div><button class="btn btn-primary" style="margin-top:10px" id="aaBtn">Adicionar</button></div>';
+  b.querySelectorAll('[data-ta]').forEach(function(x){x.addEventListener('click',function(){toggleAd(x.dataset.ta);});});
+  document.querySelector('#aaBtn').addEventListener('click',addAd);}
+if(TAB==='pedidos'){if(API_MODE&&Date.now()-lastOrdRefresh>30000){lastOrdRefresh=Date.now();refreshOrders();}var sts=['Novo','Confirmado','Preparando','Pronto','Saiu para entrega','Entregue','Cancelado'];b.innerHTML=DB.orders.length?'<div style="overflow:auto"><table><tr><th>ID</th><th>Cliente</th><th>Itens</th><th>Total</th><th>Status</th></tr>'+DB.orders.slice().reverse().map(function(o){return '<tr><td>'+esc(o.id)+'</td><td>'+esc(o.nome)+'<br><small>'+esc(o.tipo)+' • '+esc(o.pag)+'</small></td><td>'+o.itens.map(function(i){return i.qty+'x '+esc(i.nome);}).join('<br>')+'</td><td>'+money(o.total)+'</td><td><select data-st="'+esc(o.id)+'">'+sts.map(function(s){return '<option'+(s===o.status?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td></tr>';}).join('')+'</table></div><p class="notice">⚠️ Pedidos contêm dados pessoais (nome/endereço). Não compartilhe esta tela e apague pedidos antigos quando possível (LGPD).</p>':'<div class="empty">Nenhum pedido ainda. Pedidos via WhatsApp aparecem aqui após checkout.</div>';
+  b.querySelectorAll('[data-st]').forEach(function(s){s.addEventListener('change',function(){setSt(s.dataset.st,s.value);});});}
+if(TAB==='delivery'){b.innerHTML='<div class="info"><h3>Bairros e taxas (R$)</h3>'+DB.bairros.map(function(x){return '<div class="kv"><span>'+esc(x.nome)+'</span><span><input type="number" min="0" max="500" step="0.5" value="'+(x.taxa==null?'':x.taxa)+'" placeholder="a configurar" data-tx="'+esc(x.id)+'" style="width:110px;border:1px solid #ddd;border-radius:8px;padding:6px"> <button class="mini" data-db="'+esc(x.id)+'">x</button></span></div>';}).join('')+'<div class="row2" style="margin-top:10px"><input id="nb" maxlength="60" placeholder="Novo bairro"><button class="btn btn-primary" id="abBtn">Adicionar</button></div><div class="row2" style="margin-top:10px"><div class="field"><label>Pedido mínimo (R$)</label><input type="number" id="pm" min="0" max="10000" value="'+(DB.settings.pedidoMinimo||0)+'"></div><div class="field"><label>Tempo estimado</label><input id="te" maxlength="60" value="'+esc(DB.settings.tempoEstimado||'')+'"></div></div><button class="btn btn-primary" id="sdBtn">Salvar</button></div>';
+  b.querySelectorAll('[data-tx]').forEach(function(i){i.addEventListener('change',function(){setTax(i.dataset.tx,i.value);});});
+  b.querySelectorAll('[data-db]').forEach(function(x){x.addEventListener('click',function(){delB(x.dataset.db);});});
+  document.querySelector('#abBtn').addEventListener('click',addB);
+  document.querySelector('#sdBtn').addEventListener('click',function(){DB.settings.pedidoMinimo=SEC.num(document.querySelector('#pm').value,0,10000,0);DB.settings.tempoEstimado=SEC.str(document.querySelector('#te').value,60);saveDB(DB);alert('Salvo!');});}
+if(TAB==='horarios'){b.innerHTML='<div class="info"><h3>Horários</h3>'+DB.hours.map(function(h,i){return '<div class="kv"><span>'+esc(h.dia)+'</span><span><input type="time" data-ho="'+i+'" value="'+esc(h.open)+'"> <input type="time" data-hc="'+i+'" value="'+esc(h.close)+'"> <label><input type="checkbox" data-hf="'+i+'"'+(h.fechado?' checked':'')+'> Fechado</label></span></div>';}).join('')+'</div>';
+  b.querySelectorAll('[data-ho]').forEach(function(i){i.addEventListener('change',function(){var v=SEC.safeTime(i.value,DB.hours[+i.dataset.ho].open);DB.hours[+i.dataset.ho].open=v;i.value=v;saveDB(DB);});});
+  b.querySelectorAll('[data-hc]').forEach(function(i){i.addEventListener('change',function(){var v=SEC.safeTime(i.value,DB.hours[+i.dataset.hc].close);DB.hours[+i.dataset.hc].close=v;i.value=v;saveDB(DB);});});
+  b.querySelectorAll('[data-hf]').forEach(function(i){i.addEventListener('change',function(){DB.hours[+i.dataset.hf].fechado=i.checked;saveDB(DB);});});}
+if(TAB==='loja'){var s=DB.settings;b.innerHTML='<div class="info"><h3>Informações da loja</h3><div class="field"><label>WhatsApp (somente números, com DDD)</label><input id="s_wa" maxlength="15" inputmode="numeric" value="'+esc(s.whatsapp)+'"></div><div class="field"><label>Telefone</label><input id="s_tel" maxlength="25" value="'+esc(s.telefone)+'"></div><div class="field"><label>Endereço</label><input id="s_end" maxlength="300" value="'+esc(s.endereco)+'"></div><div class="field"><label>Instagram (URL https://...)</label><input id="s_ig" maxlength="500" placeholder="https://instagram.com/..." value="'+esc(s.instagram||'')+'"></div><div class="field"><label>Descrição / Sobre</label><textarea id="s_desc" maxlength="2000">'+esc(s.descricao)+'</textarea></div><button class="btn btn-primary" id="slBtn">Salvar</button><hr><h3>Trocar senha</h3><div class="field"><label>Senha atual</label><input id="cpw0" type="password" maxlength="100" autocomplete="current-password"></div><div class="row2"><div class="field"><label>Nova senha (mín. 8)</label><input id="cpw1" type="password" maxlength="100" autocomplete="new-password"></div><div class="field"><label>Confirmar</label><input id="cpw2" type="password" maxlength="100" autocomplete="new-password"></div></div><button class="mini" id="cpBtn">Trocar senha</button></div>';
+  document.querySelector('#slBtn').addEventListener('click',saveLoja);
+  document.querySelector('#cpBtn').addEventListener('click',changePw);}
+if(TAB==='avaliacoes'){b.innerHTML='<div class="info"><h3>Avaliações (só publique com autorização do cliente — nunca invente)</h3>'+(DB.reviews.map(function(r,i){return '<div class="kv"><span>★'+r.estrelas+' '+esc(r.nome)+' — '+esc(r.texto)+'</span><button class="mini" data-dr="'+i+'">Excluir</button></div>';}).join('')||'<p class="notice">Nenhuma avaliação cadastrada.</p>')+'<div class="row2" style="margin-top:10px"><input id="rvN" maxlength="60" placeholder="Nome do cliente"><input id="rvE" type="number" min="1" max="5" value="5"></div><div class="field" style="margin-top:8px"><input id="rvT" maxlength="500" placeholder="Texto da avaliação (autorizada pelo cliente)"></div><button class="btn btn-primary" id="arBtn">Adicionar</button></div>';
+  b.querySelectorAll('[data-dr]').forEach(function(x){x.addEventListener('click',function(){if(confirm('Excluir?')){DB.reviews.splice(+x.dataset.dr,1);saveDB(DB);render();}});});
+  document.querySelector('#arBtn').addEventListener('click',function(){var n=SEC.str(document.querySelector('#rvN').value,60),t=SEC.str(document.querySelector('#rvT').value,500);if(!n||!t)return alert('Preencha nome e texto.');if(DB.reviews.length>=100)return alert('Limite de 100 avaliações. Apague antigas.');DB.reviews.push({nome:n,estrelas:SEC.num(document.querySelector('#rvE').value,1,5,5),texto:t});saveDB(DB);render();});}
+};
+function editProd(id){var p=DB.products.find(function(x){return x.id===id;})||{id:'p'+Date.now().toString(36),nome:'',desc:'',preco:null,categoria:(DB.categories[0]||{}).id||'salgados',img:'',ativo:true,favorito:false};var cats=DB.categories.map(function(c){return '<option value="'+esc(c.id)+'"'+(p.categoria===c.id?' selected':'')+'>'+esc(c.nome)+'</option>';}).join('');
+document.querySelector('#tabBody').innerHTML='<div class="info"><h3>'+(id?'Editar':'Novo')+' produto</h3><div class="row2"><div class="field"><label>Nome</label><input id="f_n" maxlength="80" value="'+esc(p.nome)+'"></div><div class="field"><label>Preço (vazio = a configurar, máx. R$ 100 mil)</label><input id="f_p" type="number" min="0" max="100000" step="0.01" value="'+(p.preco==null?'':p.preco)+'"></div></div><div class="field"><label>Descrição</label><input id="f_d" maxlength="300" value="'+esc(p.desc||'')+'"></div><div class="row2"><div class="field"><label>Categoria</label><select id="f_c">'+cats+'</select></div><div class="field"><label>Imagem (URL https://)</label><input id="f_i" maxlength="2000" value="'+esc(p.img||'')+'"></div></div><label><input type="checkbox" id="f_a"'+(p.ativo?' checked':'')+'> Ativo</label> <label><input type="checkbox" id="f_f"'+(p.favorito?' checked':'')+'> Favorito ❤️</label><div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-primary" id="spBtn">Salvar</button><button class="btn btn-ghost" id="cBtn">Cancelar</button></div></div>';
+document.querySelector('#cBtn').addEventListener('click',render);
+document.querySelector('#spBtn').addEventListener('click',function(){saveProd(p.id);});}
+function saveProd(id){var g=function(x){return document.querySelector(x).value;};var pv=SEC.str(g('#f_p'),20);var imgRaw=SEC.str(g('#f_i'),2000);
+  var img=imgRaw?(SEC.safeHttpUrl(imgRaw)?imgRaw:''):'';
+  if(imgRaw&&!img)return alert('URL de imagem inválida. Use https:// ou deixe vazio.');
+  var obj={id:id,nome:SEC.str(g('#f_n'),80),desc:SEC.str(g('#f_d'),300),preco:SEC.price(pv),categoria:g('#f_c'),img:img||SEC.PLACEHOLDER_IMG,ativo:document.querySelector('#f_a').checked,favorito:document.querySelector('#f_f').checked,promo:false};
+  if(!obj.nome)return alert('Digite o nome');
+  if(!SEC.slugOk(String(obj.categoria))&&!(DB.categories.some(function(c){return c.id===obj.categoria;})))obj.categoria=DB.categories[0].id;
+  var i=DB.products.findIndex(function(x){return x.id===id;});i>=0?DB.products[i]=Object.assign({},DB.products[i],obj):DB.products.push(obj);saveDB(DB);render();}
+function delProd(id){if(confirm('Excluir produto?')){DB.products=DB.products.filter(function(p){return p.id!==id;});saveDB(DB);render();}}
+function addCat(){var n=SEC.str(document.querySelector('#ncN').value,60);if(!n)return alert('Digite o nome.');var e=SEC.str(document.querySelector('#ncE').value,12)||'🍴';
+  var id=SEC.toSlug(n);var k=1,base=id;while(DB.categories.some(function(c){return c.id===id;})){id=base+'-'+(k++);}
+  if(DB.categories.length>=60)return alert('Limite de categorias.');DB.categories.push({id:id,nome:n,emoji:e,ordem:99});saveDB(DB);render();}
+function delCat(id){var n=DB.products.filter(function(p){return p.categoria===id;}).length;if(n>0)return alert('Há '+n+' produto(s) nesta categoria. Mova-os antes de excluir.');if(confirm('Excluir categoria?')){DB.categories=DB.categories.filter(function(c){return c.id!==id;});saveDB(DB);render();}}
+function addAd(){var n=SEC.str(document.querySelector('#naN').value,60);if(!n)return alert('Digite o nome.');DB.addons.push({id:'a'+Date.now().toString(36),nome:n,preco:SEC.price(document.querySelector('#naP').value)===null?0:SEC.price(document.querySelector('#naP').value),ativo:true});saveDB(DB);render();}
+function toggleAd(id){var a=DB.addons.find(function(x){return x.id===id;});if(a){a.ativo=!a.ativo;saveDB(DB);render();}}
+function setSt(id,v){var o=DB.orders.find(function(x){return x.id===id;});if(o){o.status=SEC.str(v,30);SYNCING=true;try{localSaveDB(DB);}finally{SYNCING=false;}if(API_MODE){apiFetch('PATCH','/api/admin/orders/'+encodeURIComponent(id),{status:o.status}).catch(function(){});}}}
+function setTax(id,v){var b=DB.bairros.find(function(x){return x.id===id;});if(b){b.taxa=SEC.price(v);saveDB(DB);render();}}
+function addB(){var n=SEC.str(document.querySelector('#nb').value,60);if(!n)return alert('Digite o bairro.');DB.bairros.push({id:'b'+Date.now().toString(36),nome:n,taxa:null,ativo:true});saveDB(DB);render();}
+function delB(id){DB.bairros=DB.bairros.filter(function(b){return b.id!==id;});saveDB(DB);render();}
+function saveLoja(){var wa=SEC.safeWa(document.querySelector('#s_wa').value);if(!wa)return alert('WhatsApp inválido. Use só números com DDD (ex: 17992154574).');
+  var ig=SEC.str(document.querySelector('#s_ig').value,500);if(ig&&!SEC.safeHttpUrl(ig))return alert('Instagram inválido. Use URL https://...');
+  DB.settings.whatsapp=wa;DB.settings.telefone=SEC.str(document.querySelector('#s_tel').value,25);DB.settings.endereco=SEC.str(document.querySelector('#s_end').value,300);DB.settings.instagram=ig;DB.settings.descricao=SEC.str(document.querySelector('#s_desc').value,2000);saveDB(DB);alert('Salvo!');}
+async function changePw(){var cur=document.querySelector('#cpw0').value,n1=document.querySelector('#cpw1').value,n2=document.querySelector('#cpw2').value;
+  if(!n1||n1.length<8)return alert('Nova senha: mínimo 8 caracteres.');if(n1.length>100)return alert('Nova senha muito longa.');if(n1!==n2)return alert('Confirmação não confere.');
+  if(API_MODE){var r=await apiFetch('POST','/api/admin/password',{current:cur,new:n1});document.querySelector('#cpw0').value=document.querySelector('#cpw1').value=document.querySelector('#cpw2').value='';return alert(r.status===200?'Senha alterada!':((r.data&&r.data.error)||'Falha ao trocar senha.'));}
+  var cred=getCred();if(!cred||!(await SEC.verifyPassword(cur,cred)))return alert('Senha atual incorreta.');
+  try{localStorage.setItem(CRED_KEY,JSON.stringify(await SEC.hashPassword(n1)));}catch(e){return alert('Falha ao salvar.');}
+  document.querySelector('#cpw0').value=document.querySelector('#cpw1').value=document.querySelector('#cpw2').value='';alert('Senha alterada!');}
+})();
+</script></body></html>
