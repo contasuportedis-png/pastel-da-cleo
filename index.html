@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: data:; frame-src https://www.google.com https://maps.google.com; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>Pastel da Cléo | Pastelaria em São José do Rio Preto – Delivery e Retirada</title>
 <meta name="description" content="Pastel da Cléo — pastelaria em São José do Rio Preto (Fraternidade). Pastéis salgados, doces, bebidas. Delivery e retirada. Peça pelo WhatsApp (17) 99215-4574.">
 <meta property="og:title" content="Pastel da Cléo — Pastéis preparados com muito sabor">
@@ -19,7 +20,7 @@
 <header class="topbar"><div class="container topbar-in">
  <a class="logo" href="#inicio"><span class="logo-mark">🥟</span><span>Pastel da Cléo<small> Rio Preto • SP</small></span></a>
  <nav class="nav"><a href="#inicio">Início</a><a href="#cardapio">Cardápio</a><a href="#sobre">Sobre nós</a><a href="#delivery">Delivery</a><a href="#local">Localização</a><a href="#contato">Contato</a></nav>
- <div class="top-actions"><button class="cart-btn" onclick="openCart()" aria-label="Carrinho">🛒<span class="cart-count" data-cart-count>0</span></button><a href="#cardapio" class="btn btn-primary" style="padding:11px 18px">Fazer pedido</a><button class="hamb" onclick="toggleMenu()">☰</button></div>
+ <div class="top-actions"><button class="cart-btn" data-action="open-cart" aria-label="Carrinho">🛒<span class="cart-count" data-cart-count>0</span></button><a href="#cardapio" class="btn btn-primary" style="padding:11px 18px">Fazer pedido</a><button class="hamb" data-action="menu">☰</button></div>
 </div><div class="mobile-menu" id="mMenu"><a href="#inicio">Início</a><a href="#cardapio">Cardápio</a><a href="#sobre">Sobre nós</a><a href="#delivery">Delivery</a><a href="#local">Localização</a><a href="#contato">Contato</a></div></header>
 
 <main id="inicio" class="container">
@@ -72,35 +73,35 @@
 </div></footer>
 
 <a data-wa target="_blank" rel="noopener" class="wa-float" aria-label="WhatsApp">💬</a>
-<nav class="bottombar"><a href="#inicio"><b>🏠</b>Início</a><a href="#cardapio"><b>🍴</b>Cardápio</a><a href="#" onclick="openCart();return false"><b>🛒</b>Carrinho (<span data-cart-count>0</span>)</a><a href="#local"><b>📍</b>Local</a><a data-wa target="_blank" rel="noopener"><b>💬</b>WhatsApp</a></nav>
+<nav class="bottombar"><a href="#inicio"><b>🏠</b>Início</a><a href="#cardapio"><b>🍴</b>Cardápio</a><a href="#" data-action="open-cart"><b>🛒</b>Carrinho (<span data-cart-count>0</span>)</a><a href="#local"><b>📍</b>Local</a><a data-wa target="_blank" rel="noopener"><b>💬</b>WhatsApp</a></nav>
 
 <div class="overlay" id="overlay"></div>
-<aside class="drawer" id="cartDrawer"><div class="drawer-head"><h3>🛒 Seu pedido</h3><button class="x" onclick="closeAll()">✕</button></div>
+<aside class="drawer" id="cartDrawer"><div class="drawer-head"><h3>🛒 Seu pedido</h3><button class="x" data-action="close">✕</button></div>
 <div class="drawer-body"><div id="cartItems"></div></div>
 <div class="drawer-foot"><div class="kv"><span>Subtotal</span><strong id="cartSub">R$ 0</strong></div><div class="kv"><span>Entrega</span><strong id="cartFee">R$ 0</strong></div><div class="total-row"><span>Total</span><span id="cartTotal">R$ 0</span></div>
-<button class="btn btn-primary btn-block btn-lg" onclick="openCheckout()">Finalizar pedido →</button><button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeAll()">Continuar comprando</button></div></aside>
+<button class="btn btn-primary btn-block btn-lg" data-action="checkout">Finalizar pedido →</button><button class="btn btn-ghost btn-block" style="margin-top:8px" data-action="close">Continuar comprando</button></div></aside>
 
 <div class="modal" id="productModal"><div class="modal-box" id="modalBox"></div></div>
 
 <div class="modal" id="checkoutModal"><div class="modal-box"><div class="modal-pad">
 <h3 style="font-family:Sora;margin:0">Finalizar pedido 🧾</h3><p style="color:#6B625C">Rapidinho, prometo 🙂</p>
 <div class="field"><label>Seu nome</label><input id="coName" maxlength="80" autocomplete="name" placeholder="Digite seu nome"></div>
-<div class="field"><label>Tipo de pedido</label><div class="radio-cards"><div class="radio-card" data-tipo="delivery" onclick="setTipo('delivery')">🛵 Delivery</div><div class="radio-card" data-tipo="retirada" onclick="setTipo('retirada')">🏃 Retirada no local</div></div></div>
-<div id="addrBox"><div class="field"><label>Bairro</label><input id="coBairro" maxlength="80" autocomplete="address-level3" list="bairroList" placeholder="Ex: Fraternidade" oninput="checkout.bairro=this.value;syncCheckoutForm()"><datalist id="bairroList"></datalist></div>
+<div class="field"><label>Tipo de pedido</label><div class="radio-cards"><div class="radio-card" data-action="tipo" data-tipo="delivery">🛵 Delivery</div><div class="radio-card" data-action="tipo" data-tipo="retirada">🏃 Retirada no local</div></div></div>
+<div id="addrBox"><div class="field"><label>Bairro</label><input id="coBairro" maxlength="80" autocomplete="address-level3" list="bairroList" placeholder="Ex: Fraternidade"><datalist id="bairroList"></datalist></div>
 <div class="row2"><div class="field"><label>Rua</label><input id="coRua" maxlength="120" autocomplete="street-address" placeholder="Rua / Avenida"></div><div class="field"><label>Número</label><input id="coNum" maxlength="20" inputmode="numeric" autocomplete="off" placeholder="123"></div></div>
 <div class="row2"><div class="field"><label>Complemento</label><input id="coCompl" maxlength="80" autocomplete="off" placeholder="Apto, bloco..."></div><div class="field"><label>Referência</label><input id="coRef" maxlength="120" autocomplete="off" placeholder="Próx. à..."></div></div>
 <div class="notice" id="feeHint"></div></div>
-<div class="field" style="margin-top:12px"><label>Forma de pagamento</label><div class="pay-grid"><div class="pay" data-pay="Pix" onclick="setPay('Pix')">⚡ Pix</div><div class="pay" data-pay="Dinheiro" onclick="setPay('Dinheiro')">💵 Dinheiro</div><div class="pay" data-pay="Cartão de crédito" onclick="setPay('Cartão de crédito')">💳 Crédito</div><div class="pay" data-pay="Cartão de débito" onclick="setPay('Cartão de débito')">💳 Débito</div></div></div>
-<div id="trocoBox"><div class="field"><label>Precisa de troco?</label><div class="radio-cards"><div class="radio-card" data-troco="nao" onclick="setTroco('nao')">Não</div><div class="radio-card" data-troco="sim" onclick="setTroco('sim')">Sim</div></div></div>
+<div class="field" style="margin-top:12px"><label>Forma de pagamento</label><div class="pay-grid"><div class="pay" data-action="pay" data-pay="Pix">⚡ Pix</div><div class="pay" data-action="pay" data-pay="Dinheiro">💵 Dinheiro</div><div class="pay" data-action="pay" data-pay="Cartão de crédito">💳 Crédito</div><div class="pay" data-action="pay" data-pay="Cartão de débito">💳 Débito</div></div></div>
+<div id="trocoBox"><div class="field"><label>Precisa de troco?</label><div class="radio-cards"><div class="radio-card" data-action="troco" data-troco="nao">Não</div><div class="radio-card" data-action="troco" data-troco="sim">Sim</div></div></div>
 <div class="field" id="trocoParaBox"><label>Troco para R$</label><input id="coTrocoPara" maxlength="20" inputmode="decimal" autocomplete="off" placeholder="Ex: 50"></div></div>
-<button class="btn btn-primary btn-block btn-lg" onclick="finishOrder()">ENVIAR PEDIDO NO WHATSAPP 💬</button>
-<button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeAll()">Voltar</button>
+<button class="btn btn-primary btn-block btn-lg" data-action="finish">ENVIAR PEDIDO NO WHATSAPP 💬</button>
+<button class="btn btn-ghost btn-block" style="margin-top:8px" data-action="close">Voltar</button>
 </div></div></div>
 
 <div class="modal" id="successModal"><div class="modal-box"><div class="modal-pad" style="text-align:center">
 <div style="font-size:56px">🎉</div><h3 style="font-family:Sora">Pedido recebido!</h3><p>Seu pedido foi enviado para a Pastel da Cléo no WhatsApp.</p>
 <div class="steps" id="orderSteps"></div>
-<button class="btn btn-primary btn-block" onclick="closeAll()">Voltar ao cardápio</button>
+<button class="btn btn-primary btn-block" data-action="close">Voltar ao cardápio</button>
 </div></div></div>
 
 <script src="assets/js/data.js"></script><script src="assets/js/security.js"></script><script src="assets/js/api.js"></script><script src="assets/js/app.js"></script>

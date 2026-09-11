@@ -30,11 +30,11 @@ function renderStatus(){
 function cardHTML(p){
   const unavailable=p.preco==null||!p.ativo;
   return `<article class="card ${unavailable?'unavail':''}">
-   <div class="card-img"><img loading="lazy" decoding="async" src="${typeof SEC!=='undefined'?SEC.safeImg(p.img):esc(p.img)}" alt="${esc(p.nome)}" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1601050690597-df0568f70950?w=800&q=80&auto=format&fit=crop'">
+   <div class="card-img"><img loading="lazy" decoding="async" src="${typeof SEC!=='undefined'?SEC.safeImg(p.img):esc(p.img)}" alt="${esc(p.nome)}">
    ${p.favorito?'<span class="badge">❤️ Favorito</span>':''}${p.promo?'<span class="badge red" style="left:auto;right:12px">Promo</span>':''}</div>
    <div class="card-body"><h3>${esc(p.nome)}</h3><p>${esc(p.desc)}</p>
    <div class="price-row"><div class="price">${p.preco==null?'Consultar':money(p.preco)}</div>
-   <button class="add-btn" onclick="openProduct('${p.id}')">+ Adicionar</button></div></div></article>`;
+   <button class="add-btn" data-action="product" data-id="${esc(p.id)}">+ Adicionar</button></div></div></article>`;
 }
 function renderFavs(){
   const favs=DB.products.filter(p=>p.favorito&&p.ativo).slice(0,6);
@@ -76,23 +76,23 @@ function openProduct(id){
   modalPid=id;modalQty=1;modalAddons=new Set();modalObs='';
   const addons=DB.addons.filter(a=>a.ativo);
   $('#modalBox').innerHTML=`
-   <img class="modal-img" src="${typeof SEC!=='undefined'?SEC.safeImg(p.img):esc(p.img)}" alt="${esc(p.nome)}" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1601050690597-df0568f70950?w=800&q=80&auto=format&fit=crop'">
+   <img class="modal-img" src="${typeof SEC!=='undefined'?SEC.safeImg(p.img):esc(p.img)}" alt="${esc(p.nome)}">
    <div class="modal-pad">
     <h3 style="margin:0;font-family:Sora;font-size:22px">${esc(p.nome)}</h3>
     <p style="color:#6B625C">${esc(p.desc)}</p>
     <div class="price" style="font-size:22px">${p.preco==null?'Preço a configurar':money(p.preco)}</div>
     <h4 style="margin:16px 0 8px">Quantidade</h4>
-    <div class="qty" style="font-size:18px"><button onclick="mQty(-1)">−</button><strong id="mQty">1</strong><button onclick="mQty(1)">+</button></div>
+    <div class="qty" style="font-size:18px"><button data-action="mqty" data-v="-1" aria-label="Diminuir">−</button><strong id="mQty">1</strong><button data-action="mqty" data-v="1" aria-label="Aumentar">+</button></div>
     <h4 style="margin:16px 0 8px">Adicionais</h4>
-    <div id="mAddons">${addons.length?addons.map(a=>`<div class="addon" onclick="toggleAddon('${a.id}',this)"><label style="display:flex;gap:10px;align-items:center"><input type="checkbox"> ${esc(a.nome)}</label><strong>${a.preco?money(a.preco):'Grátis'}</strong></div>`).join(''):'<div class="notice">Informação a configurar no painel administrativo.</div>'}</div>
+    <div id="mAddons">${addons.length?addons.map(a=>`<div class="addon" data-action="addon" data-id="${esc(a.id)}"><label style="display:flex;gap:10px;align-items:center"><input type="checkbox" tabindex="-1"> ${esc(a.nome)}</label><strong>${a.preco?money(a.preco):'Grátis'}</strong></div>`).join(''):'<div class="notice">Informação a configurar no painel administrativo.</div>'}</div>
     <div class="field" style="margin-top:12px"><label>Observações (ex: sem cebola)</label><textarea id="mObs" maxlength="200" placeholder="Sem cebola..."></textarea></div>
-    <button class="btn btn-primary btn-block btn-lg" onclick="addToCart()">ADICIONAR AO CARRINHO • <span id="mTotal"></span></button>
-    <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="closeModal()">Continuar comprando</button>
+    <button class="btn btn-primary btn-block btn-lg" data-action="madd">ADICIONAR AO CARRINHO • <span id="mTotal"></span></button>
+    <button class="btn btn-ghost btn-block" style="margin-top:10px" data-action="close-modal">Continuar comprando</button>
    </div>`;
   updateModalTotal();openOverlay('productModal');
 }
 function mQty(d){modalQty=Math.max(1,Math.min(20,modalQty+d));$('#mQty').textContent=modalQty;updateModalTotal();}
-function toggleAddon(id,el){const cb=el.querySelector('input');cb.checked=!cb.checked;el.classList.toggle('sel',cb.checked);cb.checked?modalAddons.add(id):modalAddons.delete(id);updateModalTotal();}
+function toggleAddonBox(el){var id=el.dataset.id;var cb=el.querySelector('input');cb.checked=!cb.checked;el.classList.toggle('sel',cb.checked);if(cb.checked)modalAddons.add(id);else modalAddons.delete(id);updateModalTotal();}
 function updateModalTotal(){const p=productById(modalPid);let t=(Number(p.preco)||0)*modalQty;modalAddons.forEach(id=>{const a=DB.addons.find(x=>x.id===id);if(a)t+=Number(a.preco||0)*modalQty;});const e=$('#mTotal');if(e)e.textContent=p.preco==null?'Consultar':money(t);}
 function addToCart(){
   const p=productById(modalPid);if(p.preco==null){alert('Preço deste produto ainda está a configurar. Chame no WhatsApp para consultar.');return;}
@@ -110,7 +110,7 @@ function renderCart(){
   document.querySelectorAll('[data-cart-count]').forEach(e=>e.textContent=n);
   const box=$('#cartItems');if(!box)return;
   if(!cart.length){box.innerHTML='<div class="empty">Seu carrinho está vazio.<br>Que tal um pastel crocante? 🥟</div>';}
-  else box.innerHTML=cartDetailed().map((i,idx)=>`<div class="cart-item"><img src="${typeof SEC!=='undefined'?SEC.safeImg(i.p.img):esc(i.p.img)}" alt="" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1601050690597-df0568f70950?w=800&q=80'"><div class="ci-in"><strong>${esc(i.p.nome)} × ${i.qty}</strong><small>${i.ad.map(a=>esc(a.nome)).join(', ')||''} ${i.obs?'• '+esc(i.obs):''}</small><div class="qty"><button onclick="chQty(${idx},-1)">−</button><strong>${i.qty}</strong><button onclick="chQty(${idx},1)">+</button><span style="margin-left:auto;font-weight:800">${money(i.sub)}</span></div><button onclick="rmItem(${idx})" style="background:none;border:0;color:#C8102E;font-size:12px;font-weight:700;cursor:pointer;padding:4px 0">remover</button></div></div>`).join('');
+  else box.innerHTML=cartDetailed().map((i,idx)=>`<div class="cart-item"><img src="${typeof SEC!=='undefined'?SEC.safeImg(i.p.img):esc(i.p.img)}" alt=""><div class="ci-in"><strong>${esc(i.p.nome)} × ${i.qty}</strong><small>${i.ad.map(a=>esc(a.nome)).join(', ')||''} ${i.obs?'• '+esc(i.obs):''}</small><div class="qty"><button data-action="cdec" data-idx="${idx}" aria-label="Diminuir">−</button><strong>${i.qty}</strong><button data-action="cinc" data-idx="${idx}" aria-label="Aumentar">+</button><span style="margin-left:auto;font-weight:800">${money(i.sub)}</span></div><button data-action="crm" data-idx="${idx}" style="background:none;border:0;color:#C8102E;font-size:12px;font-weight:700;cursor:pointer;padding:4px 0">remover</button></div></div>`).join('');
   const fee=deliveryFee();
   $('#cartSub').textContent=money(cartSubtotal());
   $('#cartFee').textContent=checkout.tipo==='delivery'?(fee==null?'a configurar':money(fee)):money(0);
@@ -240,7 +240,36 @@ document.addEventListener('DOMContentLoaded',()=>{
   syncWithServer(); // backend (se houver): atualiza cardápio/preços sem travar a tela
   setInterval(renderStatus,60000);
   const si=$('#searchInput');if(si)si.addEventListener('input',e=>{searchTerm=e.target.value;renderMenu();});
+  const cb=$('#coBairro');if(cb)cb.addEventListener('input',e=>{checkout.bairro=e.target.value;syncCheckoutForm();});
   $('#overlay').addEventListener('click',closeAll);
   document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAll();});
 });
+/* Delegação única de cliques (sem JS inline — compatível com CSP strict). */
+document.addEventListener('click',function(e){
+  const el=e.target.closest?e.target.closest('[data-action]'):null;
+  if(!el||!document.contains(el))return;
+  if(el.tagName==='A'&&el.getAttribute('href')==='#')e.preventDefault();
+  const a=el.dataset.action,v=el.dataset.v,idx=Number(el.dataset.idx);
+  if(a==='open-cart')openCart();
+  else if(a==='close')closeAll();
+  else if(a==='close-modal')closeModal();
+  else if(a==='checkout')openCheckout();
+  else if(a==='finish')finishOrder();
+  else if(a==='menu')toggleMenu();
+  else if(a==='product')openProduct(el.dataset.id);
+  else if(a==='mqty')mQty(Number(v)||0);
+  else if(a==='madd')addToCart();
+  else if(a==='addon')toggleAddonBox(el);
+  else if(a==='cinc')chQty(idx,1);
+  else if(a==='cdec')chQty(idx,-1);
+  else if(a==='crm')rmItem(idx);
+  else if(a==='tipo')setTipo(el.dataset.tipo);
+  else if(a==='pay')setPay(el.dataset.pay);
+  else if(a==='troco')setTroco(el.dataset.troco);
+});
+/* Fallback de imagens quebradas sem `onerror` inline (CSP strict). */
+document.addEventListener('error',function(e){
+  const t=e.target;
+  if(t&&t.tagName==='IMG'&&!t.dataset.fbk){t.dataset.fbk='1';t.src=(typeof SEC!=='undefined'?SEC.PLACEHOLDER_IMG:'https://images.unsplash.com/photo-1601050690597-df0568f70950?w=800&q=80&auto=format&fit=crop');}
+},true);
 function toggleMenu(){$('#mMenu').classList.toggle('open');}
