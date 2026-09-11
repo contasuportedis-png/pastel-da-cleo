@@ -1,0 +1,13 @@
+# Deploy 1-clique no Render (plano gratuito)
+# https://render.com/deploy?repo=https://github.com/contasuportedis-png/pastel-da-cleo
+services:
+  - type: web
+    name: pastel-da-cleo
+    runtime: node
+    plan: free
+    buildCommand: npm install --omit=dev
+    startCommand: node server.mjs
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 24
