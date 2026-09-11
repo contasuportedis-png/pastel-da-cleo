@@ -228,12 +228,19 @@ function sanitizeOrder(b) {
   const strip = v => sstr(v, 120).replace(/[<>]/g, '');
   const addr = { rua: strip(b.rua).slice(0, 120), numero: strip(b.numero).slice(0, 20), bairro: strip(b.bairro).slice(0, 80), compl: strip(b.compl).slice(0, 80), ref: sstr(b.ref, 120).replace(/[<>]/g, ''), trocoPara: sstr(b.trocoPara, 20) };
   if (tipo === 'delivery' && (!addr.rua || !addr.numero || !addr.bairro)) throw err(400, 'Endereço incompleto.');
-  // piso verificado: soma dos preços oficiais dos itens conhecidos (sem adicionais/taxa, que só aumentam)
+  // consistência interna: total === Σ(sub) + fee (em centavos, sem erro de float)
+  const sumSub = cleanItens.reduce((s, i) => s + i.sub, 0);
+  if (Math.round(total * 100) !== Math.round((sumSub + fee) * 100)) throw err(400, 'Total incompatível com os itens.');
+  // piso verificado: preços oficiais dos itens conhecidos (adicionais/taxa só aumentam, nunca diminuem)
   let floor = 0;
   const qProd = db.prepare('SELECT preco FROM products WHERE (id=? OR nome=?) AND ativo=1 LIMIT 1');
   for (const it of cleanItens) {
-    const prod = qProd.get(it.pid || '\0', it.nome);
-    if (prod && prod.preco !== null && prod.preco !== undefined) floor += Number(prod.preco) * it.qty;
+    const prod = qProd.get(it.pid || '', it.nome);
+    if (prod && prod.preco !== null && prod.preco !== undefined) {
+      const base = Number(prod.preco) * it.qty;
+      if (it.sub + 0.009 < base) throw err(400, 'Subtotal abaixo do cardápio.');
+      floor += base;
+    }
   }
   if (total + 0.009 < floor) throw err(400, 'Total incompatível com o cardápio.');
   let id = (typeof b.id === 'string' && /^[A-Za-z0-9-]{1,30}$/.test(b.id)) ? b.id : ('PED-' + Date.now().toString(36).toUpperCase());
@@ -313,12 +320,12 @@ function parseBody(req, limit) {
     req.on('error', () => reject(err(400, 'Falha de leitura.')));
   });
 }
-const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json', '.xml': 'application/xml; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
 function serveStatic(req, res, pathname) {
   let p = pathname;
   if (p === '/' ) p = '/index.html';
   else if (p === '/admin') p = '/admin.html';
-  const MAP = { '/index.html': 1, '/admin.html': 1 };
+  const MAP = { '/index.html': 1, '/admin.html': 1, '/sitemap.xml': 1 };
   const isAsset = p.startsWith('/assets/');
   if (!MAP[p] && !isAsset) return false;
   const full = path.normalize(path.join(ROOT, p));
