@@ -202,25 +202,44 @@ function sanitizeAdminData(b) {
 
 function sanitizeOrder(b) {
   if (!b || typeof b !== 'object') throw err(400, 'Pedido inválido.');
-  const itens = Array.isArray(b.itens) ? b.itens.slice(0, 50).map(i => ({
-    nome: sstr(i.nome, 80) || 'Item',
-    qty: Math.max(1, Math.min(99, snum(i.qty, 1, 99, 1) | 0)),
-    sub: snum(i.sub, 0, 100000, 0)
-  })) : [];
-  if (!itens.length) throw err(400, 'Pedido vazio.');
-  const tipo = b.tipo === 'delivery' ? 'delivery' : 'retirada';
-  const nome = sstr(b.nome, 80);
+  const rawItens = Array.isArray(b.itens) ? b.itens : [];
+  if (!rawItens.length || rawItens.length > 50) throw err(400, 'Itens inválidos (1–50 por pedido).');
+  const cleanItens = rawItens.map(i => {
+    if (!i || typeof i !== 'object') throw err(400, 'Item inválido.');
+    const q = Number(i.qty);
+    if (!Number.isInteger(q) || q < 1 || q > 99) throw err(400, 'Quantidade inválida (1–99).');
+    const sub = Number(i.sub);
+    if (!Number.isFinite(sub) || sub < 0 || sub > 100000) throw err(400, 'Subtotal inválido.');
+    const nome = sstr(i.nome, 80).replace(/[<>]/g, '');
+    if (!nome) throw err(400, 'Item sem nome.');
+    return {
+      pid: (typeof i.pid === 'string' && /^[A-Za-z0-9-]{1,80}$/.test(i.pid)) ? i.pid : null,
+      nome, qty: q, sub: Math.round(sub * 100) / 100
+    };
+  });
+  if (b.tipo !== 'delivery' && b.tipo !== 'retirada') throw err(400, 'Tipo inválido.');
+  const tipo = b.tipo;
+  const nome = sstr(b.nome, 80).replace(/[<>]/g, '');
   if (!nome) throw err(400, 'Nome obrigatório.');
   if (!PAY_METHODS.includes(b.pag)) throw err(400, 'Pagamento inválido.');
-  const addr = {
-    rua: sstr(b.rua, 120), numero: sstr(b.numero, 20), bairro: sstr(b.bairro, 80),
-    compl: sstr(b.compl, 80), ref: sstr(b.ref, 120), trocoPara: sstr(b.trocoPara, 20)
-  };
+  const total = Number(b.total), fee = Number(b.fee);
+  if (!Number.isFinite(total) || total < 0 || total > 100000) throw err(400, 'Total inválido.');
+  if (!Number.isFinite(fee) || fee < 0 || fee > 1000) throw err(400, 'Taxa inválida.');
+  const strip = v => sstr(v, 120).replace(/[<>]/g, '');
+  const addr = { rua: strip(b.rua).slice(0, 120), numero: strip(b.numero).slice(0, 20), bairro: strip(b.bairro).slice(0, 80), compl: strip(b.compl).slice(0, 80), ref: sstr(b.ref, 120).replace(/[<>]/g, ''), trocoPara: sstr(b.trocoPara, 20) };
   if (tipo === 'delivery' && (!addr.rua || !addr.numero || !addr.bairro)) throw err(400, 'Endereço incompleto.');
+  // piso verificado: soma dos preços oficiais dos itens conhecidos (sem adicionais/taxa, que só aumentam)
+  let floor = 0;
+  const qProd = db.prepare('SELECT preco FROM products WHERE (id=? OR nome=?) AND ativo=1 LIMIT 1');
+  for (const it of cleanItens) {
+    const prod = qProd.get(it.pid || '\0', it.nome);
+    if (prod && prod.preco !== null && prod.preco !== undefined) floor += Number(prod.preco) * it.qty;
+  }
+  if (total + 0.009 < floor) throw err(400, 'Total incompatível com o cardápio.');
   let id = (typeof b.id === 'string' && /^[A-Za-z0-9-]{1,30}$/.test(b.id)) ? b.id : ('PED-' + Date.now().toString(36).toUpperCase());
   const exists = db.prepare('SELECT 1 FROM orders WHERE id=?').get(id);
   if (exists) id = id + '-' + crypto.randomBytes(2).toString('hex').toUpperCase();
-  return { id, nome, tipo, pag: b.pag, total: snum(b.total, 0, 100000, 0), fee: snum(b.fee, 0, 1000, 0), addr, itens };
+  return { id, nome, tipo, pag: b.pag, total: Math.round(total * 100) / 100, fee: Math.round(fee * 100) / 100, addr, itens: cleanItens };
 }
 
 /* ---------------- auth ---------------- */
@@ -259,10 +278,11 @@ function killSession(req) {
 /* ---------------- rate limit ---------------- */
 const loginFails = new Map(); // ip -> {fails, until}
 const orderHits = new Map();  // ip -> [ts]
+const HOUR_MAX = Number(process.env.CLEO_HOUR_MAX) || 150; // teto/hora por IP (anti-flood; minuto continua 30)
 setInterval(() => {
   const now = Date.now();
   for (const [k, v] of loginFails) if (v.until < now) loginFails.delete(k);
-  for (const [k, arr] of orderHits) { const f = arr.filter(t => now - t < 60000); f.length ? orderHits.set(k, f) : orderHits.delete(k); }
+  for (const [k, arr] of orderHits) { const f = arr.filter(t => now - t < 3600000); f.length ? orderHits.set(k, f) : orderHits.delete(k); }
 }, 60000).unref();
 const ipOf = req => (req.socket.remoteAddress || 'x').replace(/^::ffff:/, '');
 
@@ -374,8 +394,9 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/orders' && req.method === 'POST') {
       const now = Date.now();
-      const arr = (orderHits.get(ip) || []).filter(t => now - t < 60000);
-      if (arr.length >= 30) return send(res, 429, { error: 'Muitos pedidos. Aguarde um minuto.' });
+      const arr = (orderHits.get(ip) || []).filter(t => now - t < 3600000);
+      if (arr.length >= HOUR_MAX) return send(res, 429, { error: 'Limite de pedidos por hora atingido.' });
+      if (arr.filter(t => now - t < 60000).length >= 30) return send(res, 429, { error: 'Muitos pedidos. Aguarde um minuto.' });
       arr.push(now); orderHits.set(ip, arr);
       const o = sanitizeOrder(await parseBody(req, 64 * 1024));
       db.prepare('INSERT INTO orders(id,nome,tipo,pag,total,status,created_at,payload) VALUES(?,?,?,?,?,?,?,?)')
