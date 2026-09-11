@@ -220,7 +220,7 @@ function sanitizeOrder(b) {
   let id = (typeof b.id === 'string' && /^[A-Za-z0-9-]{1,30}$/.test(b.id)) ? b.id : ('PED-' + Date.now().toString(36).toUpperCase());
   const exists = db.prepare('SELECT 1 FROM orders WHERE id=?').get(id);
   if (exists) id = id + '-' + crypto.randomBytes(2).toString('hex').toUpperCase();
-  return { id, nome, tipo, pag: b.pag, total: snum(b.total, 0, 1000000, 0), addr, itens };
+  return { id, nome, tipo, pag: b.pag, total: snum(b.total, 0, 1000000, 0), fee: snum(b.fee, 0, 1000, 0), addr, itens };
 }
 
 /* ---------------- auth ---------------- */
@@ -330,8 +330,16 @@ function readAll() {
   };
 }
 function readOrders() {
+  try {
+    const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    db.prepare("DELETE FROM orders WHERE status='Cancelado' AND json_extract(payload,'$.cancelledAt') IS NOT NULL AND json_extract(payload,'$.cancelledAt') < ?").run(cutoff);
+  } catch {}
   return db.prepare('SELECT id,nome,tipo,pag,total,status,created_at AS data,payload FROM orders ORDER BY created_at DESC LIMIT 200').all()
-    .map(o => ({ id: o.id, nome: o.nome, tipo: o.tipo, pag: o.pag, total: o.total, status: o.status, data: o.data, itens: JSON.parse(o.payload).itens || [] }));
+    .map(o => {
+      let pl = {};
+      try { pl = JSON.parse(o.payload); } catch {}
+      return { id: o.id, nome: o.nome, tipo: o.tipo, pag: o.pag, total: o.total, fee: Number(pl.fee) || 0, status: o.status, data: o.data, cancelledAt: typeof pl.cancelledAt === 'string' ? pl.cancelledAt : null, itens: Array.isArray(pl.itens) ? pl.itens : [] };
+    });
 }
 
 /* ---------------- servidor ---------------- */
@@ -363,7 +371,7 @@ const server = http.createServer(async (req, res) => {
       arr.push(now); orderHits.set(ip, arr);
       const o = sanitizeOrder(await parseBody(req, 64 * 1024));
       db.prepare('INSERT INTO orders(id,nome,tipo,pag,total,status,created_at,payload) VALUES(?,?,?,?,?,?,?,?)')
-        .run(o.id, o.nome, o.tipo, o.pag, o.total, 'Novo', new Date().toISOString(), JSON.stringify({ itens: o.itens, addr: o.addr }));
+        .run(o.id, o.nome, o.tipo, o.pag, o.total, 'Novo', new Date().toISOString(), JSON.stringify({ itens: o.itens, addr: o.addr, fee: o.fee }));
       return send(res, 201, { ok: true, id: o.id });
     }
 
@@ -443,8 +451,13 @@ const server = http.createServer(async (req, res) => {
     if (mPatch && req.method === 'PATCH') {
       const b = await parseBody(req, 1024);
       if (!ORDER_STATUS.includes(b.status)) return send(res, 400, { error: 'Status inválido.' });
-      const r = db.prepare('UPDATE orders SET status=? WHERE id=?').run(b.status, mPatch[1]);
-      if (!r.changes) return send(res, 404, { error: 'Pedido não encontrado.' });
+      const row = db.prepare('SELECT payload FROM orders WHERE id=?').get(mPatch[1]);
+      if (!row) return send(res, 404, { error: 'Pedido não encontrado.' });
+      let pl = {};
+      try { pl = JSON.parse(row.payload); } catch {}
+      if (b.status === 'Cancelado') pl.cancelledAt = new Date().toISOString();
+      else delete pl.cancelledAt;
+      db.prepare('UPDATE orders SET status=?,payload=? WHERE id=?').run(b.status, JSON.stringify(pl), mPatch[1]);
       return send(res, 200, { ok: true });
     }
 

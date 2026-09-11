@@ -171,10 +171,10 @@ function finishOrder(){
   if(['Pix','Dinheiro','Cartão de crédito','Cartão de débito'].indexOf(checkout.pag)<0)checkout.pag='Pix';
   if(checkout.tipo==='delivery'&&(!checkout.rua||!checkout.numero||!checkout.bairro)){alert('Para delivery, preencha rua, número e bairro.');return;}
   if(DB.settings.pedidoMinimo&&cartSubtotal()<DB.settings.pedidoMinimo){alert(`Pedido mínimo: ${money(DB.settings.pedidoMinimo)}`);return;}
-  DB.orders.push({id:'PED-'+Date.now().toString().slice(-6),itens:cartDetailed().map(i=>({nome:String(i.p.nome).slice(0,80),qty:Math.max(1,Math.min(99,i.qty|0)),sub:i.sub})),total:cartSubtotal()+(checkout.tipo==='delivery'?(deliveryFee()||0):0),tipo:checkout.tipo,nome:checkout.nome,pag:checkout.pag,status:'Novo',data:new Date().toISOString()});
+  DB.orders.push({id:'PED-'+Date.now().toString().slice(-6),itens:cartDetailed().map(i=>({nome:String(i.p.nome).slice(0,80),qty:Math.max(1,Math.min(99,i.qty|0)),sub:i.sub})),total:cartSubtotal()+(checkout.tipo==='delivery'?(deliveryFee()||0):0),fee:checkout.tipo==='delivery'?(deliveryFee()||0):0,tipo:checkout.tipo,nome:checkout.nome,pag:checkout.pag,status:'Novo',data:new Date().toISOString()});
   if(DB.orders.length>200)DB.orders=DB.orders.slice(-200); // evita estouro de quota
   saveDB(DB);
-  serverSubmitOrder({id:DB.orders[DB.orders.length-1].id,itens:DB.orders[DB.orders.length-1].itens,total:DB.orders[DB.orders.length-1].total,tipo:checkout.tipo,nome:checkout.nome,pag:checkout.pag,rua:checkout.rua,numero:checkout.numero,bairro:checkout.bairro,compl:checkout.compl,ref:checkout.ref,trocoPara:checkout.trocoPara});
+  serverSubmitOrder({id:DB.orders[DB.orders.length-1].id,itens:DB.orders[DB.orders.length-1].itens,total:DB.orders[DB.orders.length-1].total,fee:DB.orders[DB.orders.length-1].fee,tipo:checkout.tipo,nome:checkout.nome,pag:checkout.pag,rua:checkout.rua,numero:checkout.numero,bairro:checkout.bairro,compl:checkout.compl,ref:checkout.ref,trocoPara:checkout.trocoPara});
   const msg=encodeURIComponent(buildMsg());
   showSuccess();
   setTimeout(()=>{window.open(`https://wa.me/${DB.settings.whatsapp}?text=${msg}`,'_blank');},900);

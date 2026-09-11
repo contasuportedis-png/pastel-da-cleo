@@ -97,7 +97,27 @@ async function boot(){
 function showApiSetup(){document.querySelector('#setupBox').style.display='block';document.querySelector('#loginForm').style.display='none';document.querySelector('#authTitle').textContent='Criar senha de acesso 🔑 (servidor)';msg('<p class="notice">🌐 Primeiro acesso ao <strong>servidor</strong>: esta senha valerá para o painel em qualquer aparelho.</p>');}
 function showApiLogin(){document.querySelector('#setupBox').style.display='none';document.querySelector('#loginForm').style.display='block';document.querySelector('#authTitle').textContent='Acesso restrito 🔒 (servidor)';msg('');}
 
-var TABS=[['produtos','🍴 Produtos'],['categorias','📂 Categorias'],['adicionais','🧀 Adicionais'],['pedidos','🧾 Pedidos'],['delivery','🛵 Delivery'],['horarios','⏰ Horários'],['loja','🏠 Loja'],['avaliacoes','⭐ Avaliações']];
+var TABS=[['produtos','🍴 Produtos'],['categorias','📂 Categorias'],['adicionais','🧀 Adicionais'],['pedidos','🧾 Pedidos'],['fin','💰 Financeiro'],['delivery','🛵 Delivery'],['horarios','⏰ Horários'],['loja','🏠 Loja'],['avaliacoes','⭐ Avaliações']];
+var FIN_P='all';
+function inPeriod(o){if(FIN_P==='all')return true;var t=new Date(o.data||0).getTime();if(isNaN(t))return false;if(FIN_P==='week')return Date.now()-t<7*24*3600*1000;try{var f=function(x){return new Date(x).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'});};return f(t)===f(Date.now());}catch(e){return true;}}
+function orderActions(o){
+  var id=esc(o.id),adv=null;
+  if(o.status==='Novo')adv=['Confirmado','✅ Confirmar'];
+  else if(o.status==='Confirmado')adv=['Preparando','🍳 Preparando'];
+  else if(o.status==='Preparando')adv=['Pronto','🔔 Pronto'];
+  else if(o.status==='Pronto')adv=o.tipo==='delivery'?['Saiu para entrega','🛵 Saiu p/ entrega']:['Entregue','✅ Entregue'];
+  else if(o.status==='Saiu para entrega')adv=['Entregue','✅ Entregue'];
+  if(o.status==='Cancelado')return '<span class="cd" data-cd="'+esc(o.cancelledAt||'')+'">some em 5:00</span><br><button class="mini" data-undo="'+id+'" style="margin-top:6px">↩ Desfazer</button>';
+  if(o.status==='Entregue')return '<span title="Finalizado">✅</span>';
+  return '<button class="mini" data-adv="'+id+'|'+adv[0]+'" style="border-color:#1FA855">'+adv[1]+' →</button><br><button class="mini" data-cancel="'+id+'" style="margin-top:6px;color:#8a0f24">❌ Cancelar</button>';
+}
+/* timer dos cancelados: atualiza a cada 1s e some ao zerar */
+setInterval(function(){
+  if(document.querySelector('#panel').style.display!=='block'||TAB!=='pedidos')return;
+  var exp=false,nowMs=Date.now(),found=false;
+  document.querySelectorAll('[data-cd]').forEach(function(el){found=true;var left=5*60*1000-(nowMs-new Date(el.dataset.cd||0).getTime());if(left<=0){exp=true;}else{var s=Math.ceil(left/1000);el.textContent='some em '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}});
+  if(found&&exp)render();
+},1000);
 function esc(s){return SEC.esc(s);}
 window.render=function(){
   document.querySelector('#tabs').innerHTML=TABS.map(function(t){return '<div class="tab '+(TAB===t[0]?'on':'')+'" data-tab="'+t[0]+'">'+t[1]+'</div>';}).join('');
@@ -113,8 +133,31 @@ if(TAB==='categorias'){b.innerHTML='<div class="info"><h3>Categorias</h3>'+DB.ca
 if(TAB==='adicionais'){b.innerHTML='<div class="info"><h3>Adicionais</h3>'+DB.addons.map(function(a){return '<div class="kv"><span>'+esc(a.nome)+' — '+money(a.preco)+'</span><span><button class="mini" data-ta="'+esc(a.id)+'">'+(a.ativo?'Desativar':'Ativar')+'</button></span></div>';}).join('')+'<div class="row2" style="margin-top:10px"><input id="naN" maxlength="60" placeholder="Nome"><input id="naP" placeholder="Preço" type="number" min="0" max="500" step="0.01"></div><button class="btn btn-primary" style="margin-top:10px" id="aaBtn">Adicionar</button></div>';
   b.querySelectorAll('[data-ta]').forEach(function(x){x.addEventListener('click',function(){toggleAd(x.dataset.ta);});});
   document.querySelector('#aaBtn').addEventListener('click',addAd);}
-if(TAB==='pedidos'){if(API_MODE&&Date.now()-lastOrdRefresh>30000){lastOrdRefresh=Date.now();refreshOrders();}var sts=['Novo','Confirmado','Preparando','Pronto','Saiu para entrega','Entregue','Cancelado'];b.innerHTML=DB.orders.length?'<div style="overflow:auto"><table><tr><th>ID</th><th>Cliente</th><th>Itens</th><th>Total</th><th>Status</th></tr>'+DB.orders.slice().reverse().map(function(o){return '<tr><td>'+esc(o.id)+'</td><td>'+esc(o.nome)+'<br><small>'+esc(o.tipo)+' • '+esc(o.pag)+'</small></td><td>'+o.itens.map(function(i){return i.qty+'x '+esc(i.nome);}).join('<br>')+'</td><td>'+money(o.total)+'</td><td><select data-st="'+esc(o.id)+'">'+sts.map(function(s){return '<option'+(s===o.status?' selected':'')+'>'+s+'</option>';}).join('')+'</select></td></tr>';}).join('')+'</table></div><p class="notice">⚠️ Pedidos contêm dados pessoais (nome/endereço). Não compartilhe esta tela e apague pedidos antigos quando possível (LGPD).</p>':'<div class="empty">Nenhum pedido ainda. Pedidos via WhatsApp aparecem aqui após checkout.</div>';
-  b.querySelectorAll('[data-st]').forEach(function(s){s.addEventListener('change',function(){setSt(s.dataset.st,s.value);});});}
+if(TAB==='pedidos'){if(API_MODE&&Date.now()-lastOrdRefresh>30000){lastOrdRefresh=Date.now();refreshOrders();}
+  var nowMs=Date.now(),purged=false;
+  DB.orders=DB.orders.filter(function(o){var exp=o.status==='Cancelado'&&o.cancelledAt&&(nowMs-new Date(o.cancelledAt).getTime()>5*60*1000);if(exp)purged=true;return!exp;});
+  if(purged){SYNCING=true;try{localSaveDB(DB);}finally{SYNCING=false;}}
+  b.innerHTML=DB.orders.length?'<div style="overflow:auto"><table><tr><th>ID</th><th>Cliente</th><th>Itens</th><th>Total</th><th>Ação</th></tr>'+DB.orders.slice().reverse().map(function(o){return '<tr'+(o.status==='Cancelado'?' style="opacity:.65"':'')+'><td>'+esc(o.id)+'<br><small>'+esc(o.status)+'</small></td><td>'+esc(o.nome)+'<br><small>'+esc(o.tipo)+' • '+esc(o.pag)+'</small></td><td>'+o.itens.map(function(i){return i.qty+'x '+esc(i.nome);}).join('<br>')+'</td><td>'+money(o.total)+'</td><td style="white-space:nowrap">'+orderActions(o)+'</td></tr>';}).join('')+'</table></div><p class="notice">⚠️ Pedidos contêm dados pessoais (nome/endereço). Não compartilhe esta tela (LGPD). Cancelados somem sozinhos após 5 min.</p>':'<div class="empty">Nenhum pedido ainda. Pedidos via WhatsApp aparecem aqui após checkout.</div>';
+  b.querySelectorAll('[data-adv]').forEach(function(x){x.addEventListener('click',function(){var p=x.dataset.adv.split('|');setSt(p[0],p[1]);});});
+  b.querySelectorAll('[data-cancel]').forEach(function(x){x.addEventListener('click',function(){if(confirm('Cancelar este pedido? Ele some da lista em 5 minutos.'))setSt(x.dataset.cancel,'Cancelado');});});
+  b.querySelectorAll('[data-undo]').forEach(function(x){x.addEventListener('click',function(){setSt(x.dataset.undo,'Novo');});});}
+if(TAB==='fin'){
+  var periods=[['today','📅 Hoje'],['week','🗓️ 7 dias'],['all','📊 Tudo']];
+  var list=DB.orders.filter(inPeriod);
+  var act=list.filter(function(o){return o.status!=='Cancelado';});
+  var bruto=act.reduce(function(s,o){return s+(Number(o.total)||0);},0);
+  var fees=act.reduce(function(s,o){return s+(Number(o.fee)||0);},0);
+  var liq=bruto-fees,n=act.length,ticket=n?bruto/n:0;
+  var byPay={},bySt={};
+  act.forEach(function(o){var k=o.pag||'—';byPay[k]=byPay[k]||{n:0,t:0};byPay[k].n++;byPay[k].t+=Number(o.total)||0;});
+  list.forEach(function(o){var k=o.status||'—';bySt[k]=(bySt[k]||0)+1;});
+  var card=function(l,v){return '<div class="info"><small style="color:#6B625C;font-weight:700">'+l+'</small><div style="font-family:Sora;font-size:24px;font-weight:800">'+v+'</div></div>';};
+  b.innerHTML='<div class="tabs" style="margin-top:0">'+periods.map(function(p){return '<div class="tab'+(FIN_P===p[0]?' on':'')+'" data-fp="'+p[0]+'">'+p[1]+'</div>';}).join('')+'</div>'
+  +'<div class="info-grid">'+card('💰 Bruto',money(bruto))+card('🛵 Taxas de entrega',money(fees))+card('✅ Líquido (bruto − taxas)',money(liq))+card('🧾 Ticket médio • '+n+' pedido(s)',money(ticket))+'</div>'
+  +'<div class="info" style="margin-top:14px"><h3>Por pagamento</h3>'+(Object.keys(byPay).map(function(k){return '<div class="kv"><span>'+esc(k)+' ('+byPay[k].n+')</span><strong>'+money(byPay[k].t)+'</strong></div>';}).join('')||'<p class="notice">Sem vendas no período.</p>')+'</div>'
+  +'<div class="info" style="margin-top:14px"><h3>Por status</h3>'+(Object.keys(bySt).map(function(k){return '<div class="kv"><span>'+esc(k)+'</span><strong>'+bySt[k]+'</strong></div>';}).join('')||'<p class="notice">Sem pedidos no período.</p>')+'</div>'
+  +'<p class="notice">Cancelados não entram nas contas. Taxas "a configurar" contam como R$ 0.</p>';
+  b.querySelectorAll('[data-fp]').forEach(function(x){x.addEventListener('click',function(){FIN_P=x.dataset.fp;render();});});}
 if(TAB==='delivery'){b.innerHTML='<div class="info"><h3>Bairros e taxas (R$)</h3>'+DB.bairros.map(function(x){return '<div class="kv"><span>'+esc(x.nome)+'</span><span><input type="number" min="0" max="500" step="0.5" value="'+(x.taxa==null?'':x.taxa)+'" placeholder="a configurar" data-tx="'+esc(x.id)+'" style="width:110px;border:1px solid #ddd;border-radius:8px;padding:6px"> <button class="mini" data-db="'+esc(x.id)+'">x</button></span></div>';}).join('')+'<div class="row2" style="margin-top:10px"><input id="nb" maxlength="60" placeholder="Novo bairro"><button class="btn btn-primary" id="abBtn">Adicionar</button></div><div class="row2" style="margin-top:10px"><div class="field"><label>Pedido mínimo (R$)</label><input type="number" id="pm" min="0" max="10000" value="'+(DB.settings.pedidoMinimo||0)+'"></div><div class="field"><label>Tempo estimado</label><input id="te" maxlength="60" value="'+esc(DB.settings.tempoEstimado||'')+'"></div></div><button class="btn btn-primary" id="sdBtn">Salvar</button></div>';
   b.querySelectorAll('[data-tx]').forEach(function(i){i.addEventListener('change',function(){setTax(i.dataset.tx,i.value);});});
   b.querySelectorAll('[data-db]').forEach(function(x){x.addEventListener('click',function(){delB(x.dataset.db);});});
@@ -149,7 +192,7 @@ function addCat(){var n=SEC.str(document.querySelector('#ncN').value,60);if(!n)r
 function delCat(id){var n=DB.products.filter(function(p){return p.categoria===id;}).length;if(n>0)return alert('Há '+n+' produto(s) nesta categoria. Mova-os antes de excluir.');if(confirm('Excluir categoria?')){DB.categories=DB.categories.filter(function(c){return c.id!==id;});saveDB(DB);render();}}
 function addAd(){var n=SEC.str(document.querySelector('#naN').value,60);if(!n)return alert('Digite o nome.');DB.addons.push({id:'a'+Date.now().toString(36),nome:n,preco:SEC.price(document.querySelector('#naP').value)===null?0:SEC.price(document.querySelector('#naP').value),ativo:true});saveDB(DB);render();}
 function toggleAd(id){var a=DB.addons.find(function(x){return x.id===id;});if(a){a.ativo=!a.ativo;saveDB(DB);render();}}
-function setSt(id,v){var o=DB.orders.find(function(x){return x.id===id;});if(o){o.status=SEC.str(v,30);SYNCING=true;try{localSaveDB(DB);}finally{SYNCING=false;}if(API_MODE){apiFetch('PATCH','/api/admin/orders/'+encodeURIComponent(id),{status:o.status}).catch(function(){});}}}
+function setSt(id,v){var o=DB.orders.find(function(x){return x.id===id;});if(o){o.status=SEC.str(v,30);if(v==='Cancelado')o.cancelledAt=new Date().toISOString();else delete o.cancelledAt;SYNCING=true;try{localSaveDB(DB);}finally{SYNCING=false;}render();if(API_MODE){apiFetch('PATCH','/api/admin/orders/'+encodeURIComponent(id),{status:o.status}).catch(function(){});}}}
 function setTax(id,v){var b=DB.bairros.find(function(x){return x.id===id;});if(b){b.taxa=SEC.price(v);saveDB(DB);render();}}
 function addB(){var n=SEC.str(document.querySelector('#nb').value,60);if(!n)return alert('Digite o bairro.');DB.bairros.push({id:'b'+Date.now().toString(36),nome:n,taxa:null,ativo:true});saveDB(DB);render();}
 function delB(id){DB.bairros=DB.bairros.filter(function(b){return b.id!==id;});saveDB(DB);render();}
